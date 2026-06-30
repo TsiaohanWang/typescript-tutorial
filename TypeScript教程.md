@@ -42,7 +42,7 @@ greet("Maddison", Date());
 // 编译时报错：Argument of type 'string' is not assignable to parameter of type 'Date'
 ```
 
-**关键理解**：TypeScript 不是另一门语言，它是 JavaScript 的超集。几乎所有 JS 代码都是合法的 TS 代码（TS 默认启用 strict 模式，禁止了 `with` 等少量老旧语法）。TS 只是在 JS 之上增加了一层**类型系统**。
+**关键理解**：TypeScript 不是另一门语言，它是 JavaScript 的**超集**——几乎所有的 JS 代码都是合法的 TS 代码。TS 只是在 JS 之上增加了一层**类型系统**。极少数 JS 语法（如 `with` 语句）在 TS 中被禁止，因为它们在严格模式下本身就不合法或无法进行类型检查。
 
 ### 1.3 类型 vs. 其他语言的对比
 
@@ -200,11 +200,13 @@ const y = 20;  // 不可变变量（对应 final/const）
 ### 3.2 基本类型
 
 ```typescript
-const name: string = "Alice";
-const age: number = 25;       // 没有 int/float 之分，都是 number
-const isOk: boolean = true;   // 小写！不是 Boolean
-const nothing: null = null;
-const notDefined: undefined = undefined;
+{
+  const name: string = "Alice";
+  const age: number = 25;       // 没有 int/float 之分，都是 number
+  const isOk: boolean = true;   // 小写！不是 Boolean
+  const nothing: null = null;
+  const notDefined: undefined = undefined;
+}
 ```
 
 > ❗ **重要**：类型名是小写 `string`、`number`、`boolean`，不是 `String`、`Number`、`Boolean`。大写版本是特殊的内置类型，几乎用不到。
@@ -214,9 +216,11 @@ const notDefined: undefined = undefined;
 用反引号 ` 代替引号，`${}` 嵌入表达式：
 
 ```typescript
-const name = "World";
-const greeting = `Hello ${name}, 2 + 3 = ${2 + 3}!`;
-console.log(greeting); // Hello World, 2 + 3 = 5!
+{
+  const name = "World";
+  const greeting = `Hello ${name}, 2 + 3 = ${2 + 3}!`;
+  console.log(greeting); // Hello World, 2 + 3 = 5!
+}
 ```
 
 对比 Python: `f"Hello {name}"`
@@ -239,8 +243,10 @@ const addArrowMulti = (a: number, b: number): number => {
   return result;
 };
 
-// 只有一个参数时可以省略括号
+// 只有一个参数时可以省略括号（但标注类型时仍需括号）
 const double = (n: number): number => n * 2;
+// 无类型注解时：
+// const double = n => n * 2;
 ```
 
 对比 Python: `lambda a, b: a + b`
@@ -251,10 +257,11 @@ const double = (n: number): number => n * 2;
 JS 中有 `==` 和 `===` 两种相等运算符：
 
 ```typescript
-// @ts-expect-error —— 不同类型比较在 strict 模式下会警告
-5 == "5"    // true  （类型转换后比较）
-// @ts-expect-error —— 同上
-5 === "5"   // false （类型不同直接返回 false）
+// TypeScript 会阻止不同类型间的直接比较：
+// @ts-expect-error
+5 == "5";   // true  （类型转换后比较）
+// @ts-expect-error
+5 === "5";  // false （类型不同直接返回 false）
 ```
 
 **始终使用 `===` 和 `!==`**，除非你明确知道自己在做什么。
@@ -296,17 +303,23 @@ const evens = nums.filter((n) => n % 2 === 0); // 过滤
 
 ```typescript
 // 对象解构
-const user = { name: "Alice", age: 25 };
-const { name, age } = user;      // 提取为同名的局部变量
-console.log(name, age);
+{
+  const user = { name: "Alice", age: 25 };
+  const { name, age } = user;      // 提取为同名的局部变量
+  console.log(name, age);
+}
 
 // 数组解构
-const [first, second] = [10, 20, 30];
-console.log(first, second);      // 10 20
+{
+  const [first, second] = [10, 20, 30];
+  console.log(first, second);      // 10 20
+}
 
 // 函数参数解构
-function greet({ name, age }: { name: string; age: number }) {
-  console.log(`${name} is ${age} years old`);
+{
+  function greet({ name, age }: { name: string; age: number }) {
+    console.log(`${name} is ${age} years old`);
+  }
 }
 ```
 
@@ -320,7 +333,9 @@ TypeScript 中类型写在**变量/参数名后面**，用冒号分隔：
 
 ```typescript
 // 变量注解
-let name: string = "Alice";
+{
+  let name: string = "Alice";
+}
 
 // 函数参数注解+返回值注解
 function greet(name: string): void {
@@ -347,7 +362,19 @@ const big: bigint = 100n;        // 大整数（ES2020+）
 const sym: symbol = Symbol("key"); // 唯一标识符
 ```
 
-> `object` 类型也是一个基础类型概念，它表示任何**非原始值**（不是 `string`/`number`/`boolean`/`bigint`/`symbol`/`null`/`undefined` 的值）。注意是 `object`（小写），不是 `Object`（大写）。
+---
+
+### 4.2.1 `object` 类型
+
+`object` 表示任何**非原始值**（不是 `string`/`number`/`boolean`/`bigint`/`symbol`/`null`/`undefined` 的值）：
+
+```typescript
+const obj: object = { key: "value" };
+const arr: object = [1, 2, 3];
+// const prim: object = 42;  // Error
+```
+
+> ❗ 注意是 `object`（小写），不是 `Object`（大写）。`Object` 是 JS 内置构造函数类型，包含所有能调用 `toString()` 等的值，约束更宽松，实际编码中几乎不该使用。
 
 ### 4.3 数组
 
@@ -442,10 +469,12 @@ enum Color {
 
 // 使用
 function move(direction: Direction) {
-  console.log(Direction[direction]); // 反向映射
+  console.log(Direction[direction]); // 反向映射（仅数字枚举支持）
 }
 move(Direction.Up);
 ```
+
+> ⚠️ **反向映射**（`Direction[direction]`）仅对数字枚举有效。字符串枚举**不会**生成反向映射。
 
 **最佳实践**：`enum` 有运行时开销（会生成 JS 对象）。如果你只需要一组字面量常量，优先使用 `as const` + 联合类型：
 
@@ -538,6 +567,7 @@ function makeDate(arg1: number, arg2?: number, arg3?: number): Date {
 
 makeDate(1234567890);        // OK
 makeDate(2024, 6, 30);       // OK
+// @ts-expect-error
 makeDate(2024, 6);           // Error: 没有匹配的重载
 ```
 
@@ -626,7 +656,7 @@ myForEachGood([1, 2], (item) => console.log(item));  // OK
 
 **原则**：回调签名描述的是**函数会怎么调用**（传递哪些参数），而不是调用者需要多少个参数。
 
-### 5.11 void 与 undefined 的区别
+### 5.11 `void` 与 `undefined` 的区别
 
 ```typescript
 type VoidFn = () => void;
@@ -664,20 +694,23 @@ const result = cb1();  // result 的类型是 void，不是 boolean
 
 ```typescript
 // ❌ 不必要的重载——可用联合类型替代
-function len(s: string): number;
-function len(arr: any[]): number;
-function len(x: any): number {
-  return x.length;
+{
+  function len(s: string): number;
+  function len(arr: any[]): number;
+  function len(x: any): number {
+    return x.length;
+  }
+  // @ts-expect-error
+  len(Math.random() > 0.5 ? "hello" : [1, 2, 3]);
 }
-
-len(Math.random() > 0.5 ? "hello" : [1, 2, 3]);
-// Error——联合类型无法匹配到任何一个重载
 
 // ✅ 使用联合类型参数
-function len(x: string | any[]): number {
-  return x.length;
+{
+  function len(x: string | any[]): number {
+    return x.length;
+  }
+  len(Math.random() > 0.5 ? "hello" : [1, 2, 3]);  // OK
 }
-len(Math.random() > 0.5 ? "hello" : [1, 2, 3]);  // OK
 ```
 
 重载的实现签名在外部不可见：
@@ -691,6 +724,7 @@ function fn(x: boolean | string) {
 
 fn(true);   // OK（匹配第一个）
 fn("hi");   // OK（匹配第二个）
+// @ts-expect-error
 fn(42);     // Error——没有匹配的重载
 ```
 
@@ -813,6 +847,7 @@ interface Point {
 }
 
 const p: Point = { x: 10, y: 20 };
+// @ts-expect-error
 p.x = 5;  // Error: Cannot assign to 'x' because it is a read-only property
 ```
 
@@ -864,20 +899,30 @@ function printCoord(pt: Point) {
 
 ```typescript
 // Interface 扩展
-interface Animal { name: string; }
-interface Bear extends Animal { honey: boolean; }
+{
+  interface Animal { name: string; }
+  interface Bear extends Animal { honey: boolean; }
+}
 
 // Type 扩展
-type Animal = { name: string; };
-type Bear = Animal & { honey: boolean; };
+{
+  type Animal = { name: string; };
+  type Bear = Animal & { honey: boolean; };
+}
 
 // Interface 合并声明
-interface Window { title: string; }
-interface Window { ts: TypeScriptAPI; }  // OK：两个声明合并为一个
+{
+  interface Box { title: string; }
+  interface Box { content: string; }  // OK：两个声明合并为一个
+}
 
 // Type 不可重复声明
-type Window = { title: string; };
-type Window = { ts: TypeScriptAPI; };  // Error：Duplicate identifier
+{
+  // @ts-expect-error
+  type Box = { title: string; };
+  // @ts-expect-error
+  type Box = { content: string; };  // Error：Duplicate identifier
+}
 ```
 
 ### 6.7 索引签名
@@ -905,6 +950,7 @@ interface Person {
 }
 
 // ❌ 对象字面量的多余属性检查
+// @ts-expect-error
 const p: Person = { name: "Alice", age: 25, email: "alice@example.com" };
 // Error: Object literal may only specify known properties
 
@@ -1322,6 +1368,7 @@ const req = { url: "https://example.com", method: "GET" };
 
 function handleRequest(url: string, method: "GET" | "POST") { }
 
+// @ts-expect-error
 handleRequest(req.url, req.method);
 // Error: string 不能赋值给 "GET" | "POST"
 ```
@@ -1346,14 +1393,18 @@ const req2 = { url: "https://example.com", method: "GET" } as const;
 TypeScript 能自动推断类型，不需要每次都写注解：
 
 ```typescript
-let name = "Alice";      // 自动推断为 string
-let age = 25;             // 自动推断为 number
-let isCool = true;        // 自动推断为 boolean
-let items = [1, 2, 3];    // 自动推断为 number[]
+{
+  let name = "Alice";      // 自动推断为 string
+  let age = 25;             // 自动推断为 number
+  let isCool = true;        // 自动推断为 boolean
+  let items = [1, 2, 3];    // 自动推断为 number[]
+}
 
 // 函数返回值自动推断
-function add(a: number, b: number) {
-  return a + b;           // 自动推断返回类型为 number
+{
+  function add(a: number, b: number) {
+    return a + b;           // 自动推断返回类型为 number
+  }
 }
 ```
 
@@ -1374,9 +1425,15 @@ const canvas2 = <HTMLCanvasElement>document.getElementById("main_canvas");
 **不能**断言为不兼容的类型：
 
 ```typescript
-const x = "hello" as number;  // Error
-// 必须先转为 any/unknown
-const x = "hello" as unknown as number;
+// ❌ 不能直接断言为不兼容的类型
+{
+  // @ts-expect-error
+  const x = "hello" as number;
+}
+// ✅ 必须先转为 any/unknown
+{
+  const x = "hello" as unknown as number;
+}
 ```
 
 ### 8.3 `@ts-expect-error` —— 抑制类型错误
@@ -1666,7 +1723,7 @@ console.log(Utils.max([1, 5, 3]));  // 5
 ### 11.1 导出与导入
 
 ```typescript
-// math.ts
+// ----- math.ts -----
 export const PI = 3.14159;
 
 export function add(a: number, b: number): number {
@@ -1680,49 +1737,27 @@ export class Calculator {
     return this;
   }
 }
-```
 
-```typescript
-// 以下为 math.ts 的内容（实际项目中放在单独文件中）
-export const PI = 3.14159;
-export function add(a: number, b: number): number {
-  return a + b;
-}
-export class Calculator {
-  result = 0;
-  add(n: number): this {
-    this.result += n;
-    return this;
-  }
-}
-
-// 在 app.ts 中使用：
+// ----- app.ts -----
 // import { PI, add, Calculator } from "./math";
-console.log(add(PI, 2));
 ```
 
 ### 11.2 默认导出
 
 ```typescript
-// 模拟 config.ts 的内容
-const config = {
+// config.ts
+export default {
   apiUrl: "https://api.example.com",
   timeout: 5000,
 };
 
-// 在 app.ts 中使用：
+// app.ts 中导入时：
 // import config from "./config";
-console.log(config.apiUrl);
 ```
 
 ### 11.3 重命名导入/导出
 
 ```typescript
-// 模拟 math.ts 的内容
-function add(a: number, b: number): number {
-  return a + b;
-}
-
 // 导入时重命名
 // import { add as sum } from "./math";
 
@@ -1732,34 +1767,23 @@ function add(a: number, b: number): number {
 // 统一导入所有
 // import * as MathUtils from "./math";
 // MathUtils.add(1, 2);
-
-// 以上直接使用函数效果相同：
-console.log(add(1, 2));
 ```
 
 ### 11.4 类型专用导入/导出
 
 ```typescript
-// 模拟 types.ts 的内容
-interface User {
+// types.ts
+export interface User {
   name: string;
   age: number;
 }
-type ID = number | string;
+export type ID = number | string;
 
-// 模拟 math.ts 的内容
-function add(a: number, b: number): number {
-  return a + b;
-}
-
-// app.ts —— 在单独文件中使用 import type：
+// app.ts —— 仅导入类型信息，编译后会被完全擦除：
 // import type { User, ID } from "./types";
-// import { add } from "./math";
 
-// 类型检查示例（直接使用本地定义，效果相同）：
-const user: User = { name: "Alice", age: 25 };
-const id: ID = 42;
-console.log(add(1, 2));
+// 也可以合并导入值和类型：
+// import { add, type Calculator } from "./math";
 ```
 
 ---
@@ -1827,6 +1851,8 @@ type Partial<T> = {
 interface Person { name: string; age: number; }
 type ReadonlyPerson = Readonly<Person>;
 type OptionalPerson = Partial<Person>;
+
+export {};
 ```
 
 ### 12.6 模板字面量类型
@@ -1853,7 +1879,7 @@ type EventHandlers = `on${Capitalize<Events>}`;
     "outDir": "./dist",         // 输出目录
     "rootDir": "./src",         // 源码目录
     "strict": true,             // 启用所有严格检查
-    "noUncheckedIndexedAccess": true, // 索引访问返回 T | undefined
+    "noUncheckedIndexedAccess": true, // 索引访问返回 T | undefined（更安全但使用不便）
     "esModuleInterop": true,    // 兼容 CommonJS 和 ES Module
     "skipLibCheck": true,       // 跳过声明文件检查（加速编译）
     "forceConsistentCasingInFileNames": true,
@@ -1866,6 +1892,8 @@ type EventHandlers = `on${Capitalize<Events>}`;
   "exclude": ["node_modules", "dist"]
 }
 ```
+
+> ⚠️ `noUncheckedIndexedAccess` 会让所有索引访问（如 `arr[i]`、`obj[key]`）的返回值类型自动包含 `undefined`。这很安全，但会使代码中频繁出现非空断言（`!`）或条件判断。初学者可以先关闭此选项，熟悉 TS 后再启用。
 
 ### 严格模式全家桶
 
