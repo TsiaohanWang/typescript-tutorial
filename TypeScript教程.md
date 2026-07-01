@@ -213,7 +213,7 @@ const y = 20;  // 不可变变量（对应 final/const）
 
 ### 3.3 模板字符串（Template Literals）
 
-用反引号 ` 代替引号，`${}` 嵌入表达式：
+用反引号代替引号，`${}` 嵌入表达式：
 
 ```typescript
 {
@@ -387,7 +387,64 @@ const arr2: Array<number> = [1, 2, 3];
 const matrix: number[][] = [[1, 2], [3, 4]];
 ```
 
-### 4.4 `any` —— 逃生舱
+### 4.4 联合类型（Union Types）
+
+联合类型用 `|` 表示一个值可以是几种类型之一——这是 TypeScript 中最常用的概念之一：
+
+```typescript
+// id 可以是 string 或 number
+function printId(id: number | string) {
+  console.log(`Your ID is: ${id}`);
+}
+
+printId(101);     // OK
+printId("202");   // OK
+// printId({ id: 123 });  // Error
+```
+
+有了联合类型，TS 只允许**所有成员共有**的操作：
+
+```typescript
+function printId(id: number | string) {
+  // id.toUpperCase();  // Error: 只有 string 有 toUpperCase，number 没有
+  // 需要用条件语句收窄类型后才能使用特定操作
+  if (typeof id === "string") {
+    console.log(id.toUpperCase());  // OK
+  } else {
+    console.log(id);                // OK
+  }
+}
+```
+
+> **与其他语言对比**：
+> - Python: `Union[int, str]`（需要导入 `typing` 模块）
+> - Java: 不直接支持，通常用接口+多态实现类似效果
+> - TS: `number | string`（原生支持，语法简洁）
+
+### 4.5 类型别名（Type Aliases）
+
+`type` 可以给类型起名字，让代码更清晰：
+
+```typescript
+// 命名联合类型
+type ID = number | string;
+
+// 命名对象类型
+type Point = {
+  x: number;
+  y: number;
+};
+
+// 命名函数类型
+type Handler = (event: string) => void;
+
+// 使用
+function printCoord(pt: Point) {
+  console.log(pt.x, pt.y);
+}
+```
+
+### 4.6 `any` —— 逃生舱
 
 ```typescript
 let value: any = 42;
@@ -410,7 +467,7 @@ value.toUpperCase(); // 不会报错（即使运行时可能出错）
 
 有了这个设置，如果 TS 无法推导出类型且你没有显式标注，就会报错。
 
-### 4.5 `unknown` —— 安全的 any
+### 4.7 `unknown` —— 安全的 any
 
 ```typescript
 let value: unknown = 42;
@@ -422,7 +479,7 @@ if (typeof value === "string") {
 }
 ```
 
-### 4.6 `void`、`never` 和 `undefined`
+### 4.8 `void`、`never` 和 `undefined`
 
 ```typescript
 // void —— 函数不返回值
@@ -441,7 +498,53 @@ function printName(name?: string): void {
 }
 ```
 
-### 4.7 `enum` —— 枚举类型
+### 4.9 字面量类型（Literal Types）
+
+特定的值本身也可以作为类型，这在限定函数参数为固定值集合时非常有用：
+
+```typescript
+// 字符串字面量类型
+type Direction = "left" | "right" | "up" | "down";
+
+// 数字字面量类型
+type DiceRoll = 1 | 2 | 3 | 4 | 5 | 6;
+
+// 布尔字面量类型（其实就是 boolean）
+type IsActive = true | false;
+```
+
+**实用场景**：
+
+```typescript
+function setAlignment(align: "left" | "center" | "right") {
+  // ...
+}
+setAlignment("left");      // OK
+// setAlignment("middle"); // Error: "middle" 不在允许的字面量中
+```
+
+**字面量推断问题**：TS 会把 `const` 声明的变量推断为字面量类型，但对象属性会被拓宽为宽泛类型：
+
+```typescript
+const req = { url: "https://example.com", method: "GET" };
+// req.method 被推断为 string，不是 "GET"
+
+function handleRequest(url: string, method: "GET" | "POST") { }
+
+// @ts-expect-error
+handleRequest(req.url, req.method);
+// Error: string 不能赋值给 "GET" | "POST"
+```
+
+**解法**：用 `as const` 让整个对象的所有属性都被推断为字面量类型：
+
+```typescript
+const req2 = { url: "https://example.com", method: "GET" } as const;
+// req2.method 的类型是 "GET"，不再是 string
+handleRequest(req2.url, req2.method);  // OK
+```
+
+### 4.10 `enum` —— 枚举类型
 
 `enum` 是 TypeScript 提供的一组命名常量，允许你定义一组有限的可选值。与大多数 TS 特性不同，`enum` 不是纯类型层面的——编译后会生成真实的对象。
 
@@ -1554,7 +1657,38 @@ const r1: Result<number> = { success: true, data: 42 };
 const r2: Result<string> = { success: false, error: "Not found" };
 ```
 
-### 9.6 泛型约束与条件类型的实用模式
+### 9.6 泛型类
+
+类也可以使用泛型参数：
+
+```typescript
+class Stack<T> {
+  private items: T[] = [];
+
+  push(item: T): void {
+    this.items.push(item);
+  }
+
+  pop(): T | undefined {
+    return this.items.pop();
+  }
+
+  peek(): T | undefined {
+    return this.items[this.items.length - 1];
+  }
+}
+
+const numStack = new Stack<number>();
+numStack.push(1);
+numStack.push(2);
+console.log(numStack.pop());  // 2
+
+const strStack = new Stack<string>();
+strStack.push("hello");
+console.log(strStack.pop());  // "hello"
+```
+
+### 9.7 泛型约束与条件类型的实用模式
 
 ```typescript
 // 提取 Promise 中的值类型
@@ -1636,7 +1770,64 @@ class ConfigShort {
 }
 ```
 
-### 10.5 继承
+### 10.5 存取器（Getters / Setters）
+
+存取器允许你用属性的语法来调用自定义的读取/设置逻辑，隐藏内部实现细节：
+
+```typescript
+class Temperature {
+  private _celsius: number;
+
+  constructor(celsius: number) {
+    this._celsius = celsius;
+  }
+
+  get fahrenheit(): number {
+    return this._celsius * 9 / 5 + 32;
+  }
+
+  set fahrenheit(value: number) {
+    this._celsius = (value - 32) * 5 / 9;
+  }
+}
+
+const t = new Temperature(100);
+console.log(t.fahrenheit);  // 212 —— 像属性一样读取
+t.fahrenheit = 32;          // 像属性一样设置
+console.log(t.fahrenheit);  // 32 —— 通过 getter 读取转换后的值
+```
+
+> **注意**：存取器的 getter 不带括号调用（`t.fahrenheit` 而不是 `t.fahrenheit()`），使用时看起来和普通属性完全一样。
+
+### 10.6 `private` vs `#`（硬私有）
+
+TypeScript 的 `private` 是**软私有**——只在编译时检查，运行时仍可通过方括号访问：
+
+```typescript
+class Secret {
+  private code = "1234";
+}
+
+const s = new Secret();
+// s.code;           // 编译报错
+(s as any).code;     // 运行时可以绕过——这就是"软私有"
+```
+
+如果你需要**硬私有**（运行时也无法访问），使用 JS 原生的 `#` 前缀：
+
+```typescript
+class RealSecret {
+  #code = "1234";
+}
+
+const r = new RealSecret();
+// r.#code;          // 编译报错
+(r as any).#code;    // 运行时也报错——真正的私有
+```
+
+> **建议**：如果只是团队内部约定，`private` 足够；如果需要防止恶意绕过，使用 `#`。
+
+### 10.7 继承
 
 ```typescript
 class Animal {
@@ -1662,7 +1853,7 @@ class Dog extends Animal {
 }
 ```
 
-### 10.6 抽象类
+### 10.8 抽象类
 
 ```typescript
 abstract class Shape {
@@ -1684,7 +1875,7 @@ class Circle extends Shape {
 }
 ```
 
-### 10.7 implements 与 interface
+### 10.9 implements 与 interface
 
 ```typescript
 interface Runnable {
@@ -1701,7 +1892,7 @@ class Dog implements Runnable, Barkable {
 }
 ```
 
-### 10.8 静态成员
+### 10.10 静态成员
 
 ```typescript
 class Utils {
@@ -1785,6 +1976,31 @@ export type ID = number | string;
 // 也可以合并导入值和类型：
 // import { add, type Calculator } from "./math";
 ```
+
+### 11.5 CommonJS 与 ES Module 的互操作
+
+JS 世界有两套模块系统：Node.js 传统的 **CommonJS**（`require`/`module.exports`）和现代标准 **ES Module**（`import`/`export`）。TypeScript 默认使用 ES Module 语法，编译时会根据 `tsconfig.json` 的 `module` 选项输出对应格式：
+
+```json
+{
+  "compilerOptions": {
+    "module": "commonjs"   // 输出 CommonJS（Node.js 默认）
+    // "module": "ESNext"  // 输出 ES Module（浏览器/Vite 默认）
+  }
+}
+```
+
+设置 `esModuleInterop: true` 后，可以用 ES Module 语法导入 CommonJS 模块：
+
+```typescript
+// 有 esModuleInterop 时，这样写是合法的：
+import express from "express";       // CommonJS 模块
+
+// 没有 esModuleInterop 时，需要：
+import * as express from "express";
+```
+
+> **建议**：新项目始终在 tsconfig 中开启 `esModuleInterop: true`，避免不必要的导入语法差异。
 
 ---
 
