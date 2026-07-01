@@ -2,6 +2,7 @@
 
 > 适用读者：有编程基础（Python/Java/C++等），但未学过 JavaScript 的学生
 > 参考来源：https://www.typescriptlang.org/docs/
+> 本教程基于 TypeScript 5.x 编写。TypeScript 6.0 于 2026 年发布，部分编译选项默认值发生了变化（如 `strict` 默认为 `true`、`target` 默认为 `es2025`），但核心语法和类型系统保持不变。详见附录 A。
 
 ---
 
@@ -68,7 +69,7 @@ const obj = { x: 0, y: 0, name: "Origin" };
 
 | 概念 | Python | TypeScript |
 |------|--------|------------|
-| 类型检查 | 运行时（duck typing） | 编译时（structural typing） |
+| 类型检查 | 外部工具静态检查（mypy/pyright）+ 运行时 duck typing | 编译时（structural typing） |
 | 类型注解 | `def greet(name: str) -> None:` | `function greet(name: string): void` |
 | 可选 | 3.5+ 通过 typing 模块 | 语言原生支持 |
 
@@ -180,6 +181,40 @@ VSCode 内置 TypeScript 支持，安装后即可获得：
 
 > 对已有编程基础的同学，这里只讲 JS 独特的地方，不讲什么是变量/循环/函数。
 
+### 前置知识：JS 特有的概念
+
+在开始之前，先了解几个 JS 特有的概念，它们在其他语言中不太常见：
+
+**Hoisting（变量提升）**：JS 引擎在执行代码前，会先把 `var` 和 `function` 声明"提升"到作用域顶部。这意味着你可以在声明之前使用它们（值为 `undefined`）。`let` 和 `const` 不会被提升，所以它们有"暂时性死区"（TDZ）——在声明前访问会报错。
+
+```typescript
+console.log(a);  // undefined（var 被提升了）
+var a = 1;
+
+// console.log(b);  // ReferenceError（let/const 有 TDZ）
+// let b = 2;
+```
+
+**闭包（Closure）**：函数可以"记住"它被创建时的词法环境。即使外部函数已经返回，内部函数仍然可以访问外部函数的变量。
+
+```typescript
+function makeCounter() {
+  let count = 0;  // 这个变量被闭包"捕获"
+  return {
+    increment: () => ++count,
+    getCount: () => count,
+  };
+}
+const counter = makeCounter();
+counter.increment();  // 1
+counter.increment();  // 2
+counter.getCount();   // 2 —— count 变量仍然存在
+```
+
+**原型链（Prototype Chain）**：JS 对象通过原型（prototype）实现继承，而不是像 Java/C++ 那样的类继承。每个对象都有一个内部链接指向另一个对象（它的原型），形成一条链。访问属性时沿链向上查找，直到找到或到达 `null`。ES6 的 `class` 语法只是原型链的语法糖。
+
+**事件循环（Event Loop）**：JS 是单线程的，但通过事件循环实现异步。代码从调用栈（Call Stack）执行，异步操作（如网络请求、定时器）由浏览器/Node 的宿主环境处理，完成后将回调放入任务队列，等调用栈清空后再执行。
+
 ### 3.1 变量声明：`let` 和 `const`
 
 ```typescript
@@ -189,7 +224,7 @@ const y = 20;  // 不可变变量（对应 final/const）
 
 - `let` 是块级作用域（block-scoped），类似于其他语言的局部变量
 - `const` 也是块级作用域，且声明后不能重新赋值
-- **不要使用 `var`**（它是函数级作用域，有 hoisting 问题，现代 JS 已弃用）
+- **不要使用 `var`**（它是函数级作用域，有 hoisting 问题，现代 JS 不推荐使用）
 
 对比其他语言：
 
@@ -259,11 +294,11 @@ const double = (n: number): number => n * 2;
 JS 中有 `==` 和 `===` 两种相等运算符：
 
 ```typescript
-// TypeScript 会阻止不同类型间的直接比较：
-// @ts-expect-error
-5 == "5";   // true  （类型转换后比较）
-// @ts-expect-error
-5 === "5";  // false （类型不同直接返回 false）
+// TypeScript 会阻止不同类型间的直接比较（因为这种比较通常是逻辑错误）：
+// @ts-expect-error —— TS 不允许 number 和 string 直接比较
+5 == "5";   // JS 运行结果: true  （隐式类型转换后比较）
+// @ts-expect-error —— TS 不允许 number 和 string 直接比较
+5 === "5";  // JS 运行结果: false （类型不同直接返回 false）
 ```
 
 **始终使用 `===` 和 `!==`**，除非你明确知道自己在做什么。
@@ -715,7 +750,7 @@ type Direction = (typeof Direction)[keyof typeof Direction];
 // Direction 的类型是 0 | 1 | 2 | 3
 ```
 
-> 枚举是一个存在争议的特性——官方文档建议"了解它存在，但除非确定需要，否则优先用 `as const`"。更多细节见：https://www.typescriptlang.org/docs/handbook/enums.html
+> 枚举是 TypeScript 特有的功能——它不是纯类型层面的，编译后会生成真实的 JS 对象。官方文档建议"了解它存在，但除非确定需要，否则谨慎使用"。如果你只需要一组命名常量而不需要反向映射，可以用 `as const` 替代。更多细节见：https://www.typescriptlang.org/docs/handbook/enums.html
 
 ---
 
@@ -2144,6 +2179,31 @@ console.log(Utils.max([1, 5, 3]));   // 5
 // u.PI;  // Error：PI 是静态成员，不能通过实例访问
 ```
 
+### 10.11 装饰器（Decorators）简介
+
+装饰器是一种特殊声明，可以附加到类声明、方法、属性或参数上，用于修改或扩展它们的行为。装饰器在 Angular（`@Component`、`@Injectable`）和 NestJS（`@Controller`、`@Module`）中被广泛使用。
+
+```typescript
+// 装饰器函数——接收类的构造函数作为参数
+function Log(originalMethod: any, context: ClassMethodDecoratorContext) {
+  return function (this: any, ...args: any[]) {
+    console.log(`Calling ${String(context.name)} with`, args);
+    return originalMethod.apply(this, args);
+  };
+}
+
+class Calculator {
+  @Log
+  add(a: number, b: number) {
+    return a + b;
+  }
+}
+
+new Calculator().add(1, 2);  // 控制台输出: Calling add with [1, 2]
+```
+
+> 装饰器目前是 TC39 Stage 3 提案，TS 5.0+ 原生支持。要启用装饰器，需要在 tsconfig 中设置 `"experimentalDecorators": true`（旧语法）或不设置（新语法，TS 5.0+ 默认支持）。Angular/NestJS 项目通常使用旧语法。
+
 ---
 
 ## 第十一章：模块系统
@@ -2261,11 +2321,81 @@ import * as express from "express";
 
 ---
 
-## 第十二章：高级类型概览（选读）
+## 第十二章：声明文件与类型空间
+
+### 12.1 什么是声明文件（.d.ts）
+
+JavaScript 库本身没有类型信息。TypeScript 通过**声明文件**（Declaration File，扩展名 `.d.ts`）为 JS 库添加类型描述。这样你在 TS 中导入 JS 库时，就能获得类型检查和自动补全。
+
+```typescript
+// 假设你安装了一个纯 JS 库 "lodash"
+import _ from "lodash";
+_.chunk([1, 2, 3, 4], 2);  // 如果没有类型定义，TS 不知道 chunk 的参数和返回值
+```
+
+### 12.2 DefinitelyTyped 与 @types
+
+社区维护了一个巨大的声明文件仓库 [DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped)，包含数万个流行 JS 库的类型定义。通过 npm 安装对应的 `@types` 包即可：
+
+```bash
+# 安装 lodash 的类型定义
+npm install -D @types/lodash
+
+# 安装 express 的类型定义
+npm install -D @types/express
+
+# 安装 node 的全局类型定义（用于 Node.js 项目）
+npm install -D @types/node
+```
+
+安装后，TS 会自动识别这些类型定义，无需额外配置。
+
+### 12.3 自己编写声明文件
+
+当你使用一个没有 `@types` 包的 JS 库时，可以自己编写声明文件：
+
+```typescript
+// types/my-lib.d.ts
+declare module "my-lib" {
+  export function doSomething(x: string): number;
+  export interface Config {
+    timeout: number;
+    retries: number;
+  }
+}
+```
+
+或者在项目中创建一个 `*.d.ts` 文件来声明全局类型：
+
+```typescript
+// global.d.ts
+declare global {
+  interface Window {
+    myAppConfig: { apiUrl: string };
+  }
+}
+
+export {};  // 确保文件被当作模块
+```
+
+### 12.4 三斜线指令（Triple-Slash Directives）
+
+早期 TS 项目用三斜线指令来引用声明文件，现在已不常用（npm + `@types` 更主流）：
+
+```typescript
+/// <reference types="node" />
+/// <reference path="./my-lib.d.ts" />
+```
+
+> **实践建议**：优先查找 `@types` 包；没有的话自己写 `.d.ts`；三斜线指令仅在特殊场景使用。
+
+---
+
+## 第十三章：高级类型概览（选读）
 
 > 本章介绍 TypeScript 的高级类型操作符，属于进阶内容。初学者可以先跳过，需要时再回来查阅。
 
-### 12.1 索引访问类型
+### 13.1 索引访问类型
 
 用 `Type["key"]` 的语法可以从一个类型中提取某个属性的类型，就像用方括号访问对象属性一样。当你需要从一个复杂的类型中提取某个字段的类型时，不必手动写出来：
 
@@ -2280,7 +2410,7 @@ type CityType = Person["address"]["city"];  // string——嵌套提取
 type NameOrAge = Person["name" | "age"];  // string | number
 ```
 
-### 12.2 `keyof` 类型操作符
+### 13.2 `keyof` 类型操作符
 
 `keyof` 接收一个对象类型，返回其所有属性名组成的联合类型。当你需要编写一个函数只接受对象已有的属性名作为参数时，`keyof` + 泛型约束可以实现编译时的属性名检查：
 
@@ -2299,7 +2429,7 @@ getProperty(p, "age");      // 返回类型是 number
 // getProperty(p, "invalid");  // Error："invalid" 不是 Person 的属性
 ```
 
-### 12.3 `typeof` 类型操作符
+### 13.3 `typeof` 类型操作符
 
 `typeof` 在类型位置使用时，获取一个值的类型。注意区分：运行时的 `typeof` 返回字符串（如 `"string"`），而类型位置的 `typeof` 返回类型。当你已经有一个具体的值（如配置对象），想从它推断出类型而不想手动写一遍时：
 
@@ -2316,7 +2446,7 @@ type Config = typeof defaultConfig;
 // { apiUrl: string; timeout: number }
 ```
 
-### 12.4 条件类型
+### 13.4 条件类型
 
 条件类型用 `T extends U ? X : Y` 的语法，根据类型参数是否满足约束来选择不同的类型，类似于运行时的三元运算符但在类型层面工作。当你需要根据输入类型的不同自动推断出不同的返回类型时：
 
@@ -2329,7 +2459,7 @@ type B = IsString<number>;  // "no"
 type C = IsString<"hello">;  // "yes"——字面量类型是 string 的子类型
 ```
 
-### 12.5 映射类型
+### 13.5 映射类型
 
 映射类型遍历一个对象类型的所有属性，对每个属性应用某种变换，语法是 `[K in keyof T]: 新类型`。当你想基于一个现有类型创建一个变体（如全部变为只读、全部变为可选）时，不必手动重写每个属性：
 
@@ -2357,7 +2487,7 @@ export {};
 
 > TypeScript 内置了 `Readonly<T>` 和 `Partial<T>` 等工具类型（见附录 B），不需要自己定义。
 
-### 12.6 模板字面量类型
+### 13.6 模板字面量类型
 
 模板字面量类型用反引号语法在类型层面拼接字符串类型，支持 `Capitalize`、`Uppercase` 等内置工具类型。当你需要描述字符串的模式（如事件名必须以 `"on"` 开头）时，可以精确约束：
 
@@ -2370,6 +2500,298 @@ type Events = "click" | "focus" | "blur";
 type EventHandlers = `on${Capitalize<Events>}`;
 // "onClick" | "onFocus" | "onBlur"
 ```
+
+---
+
+## 第十四章：Zod —— 运行时验证
+
+### 14.1 为什么需要 Zod
+
+TypeScript 的类型检查发生在**编译时**——编译完成后，所有类型信息都被擦除。这意味着当数据来自外部来源（用户输入、API 响应、配置文件等）时，TS 无法在运行时验证数据是否符合你期望的类型：
+
+```typescript
+// 编译时没问题，但运行时可能出问题
+interface User {
+  name: string;
+  age: number;
+}
+
+function processUser(data: User) {
+  console.log(data.name.toUpperCase());
+  console.log(data.age + 1);  // 这里假设 age 是 number
+}
+
+// 来自外部的"不可信"数据
+const rawData = JSON.parse('{"name": "Alice", "age": "twenty"}');
+processUser(rawData);  // 运行时错误：age 是 string "twenty"，无法做数值加法，结果是 "twenty1" 而不是 21
+```
+
+Zod 解决了这个问题：它让你用 TS 风格的代码定义 schema（模式），在运行时验证数据，同时自动推断出 TypeScript 类型。一份定义，同时获得**验证**和**类型**。
+
+### 14.2 安装与基本用法
+
+```bash
+npm install zod
+```
+
+定义 schema、验证数据、推断类型——三步完成：
+
+```typescript
+import { z } from "zod";
+
+// 1. 定义 schema
+const UserSchema = z.object({
+  name: z.string(),
+  age: z.number(),
+});
+
+// 2. 验证数据（运行时检查）
+const user = UserSchema.parse({ name: "Alice", age: 25 });
+// user 的类型自动推断为 { name: string; age: number }
+
+// 3. 直接使用，类型安全
+console.log(user.name.toUpperCase());  // OK
+```
+
+### 14.3 错误处理
+
+`parse()` 在验证失败时抛出 `ZodError`。如果你不想用 try/catch，可以用 `safeParse()` 返回一个结果对象：
+
+```typescript
+// 方式 1：try/catch
+try {
+  UserSchema.parse({ name: 42, age: "old" });
+} catch (error) {
+  if (error instanceof z.ZodError) {
+    console.log(error.issues);
+    // [
+    //   { expected: 'string', code: 'invalid_type', path: ['name'], message: '...' },
+    //   { expected: 'number', code: 'invalid_type', path: ['age'], message: '...' }
+    // ]
+  }
+}
+
+// 方式 2：safeParse（推荐——不抛异常）
+const result = UserSchema.safeParse({ name: 42, age: "old" });
+if (!result.success) {
+  console.log(result.error.issues);  // 验证失败
+} else {
+  console.log(result.data);          // { name: string; age: number }
+}
+```
+
+### 14.4 从 Schema 推断 TypeScript 类型
+
+Zod 的核心理念是**schema 即类型**——你只需定义一次 schema，用 `z.infer<>` 提取 TypeScript 类型，无需手动重复定义：
+
+```typescript
+const UserSchema = z.object({
+  name: z.string(),
+  age: z.number(),
+  email: z.string().email(),
+});
+
+// 从 schema 推断出 TS 类型
+type User = z.infer<typeof UserSchema>;
+// 等价于：type User = { name: string; age: number; email: string }
+
+// 用推断的类型标注变量
+const user: User = { name: "Alice", age: 25, email: "a@b.com" };
+```
+
+这样做的好处：schema 和类型永远同步，改一处就全部生效。
+
+### 14.5 常用 Schema 类型
+
+Zod 的 API 设计与 TypeScript 类型系统一一对应——每个 TS 类型都有一个同名的 Zod 构造函数。这些构造函数创建的 schema 会在运行时检查传入的值是否符合对应类型：
+
+```typescript
+// 原始类型——检查值是否为对应的 JS 原始类型
+z.string();      // 验证值是否为 string
+z.number();      // 验证值是否为 number（NaN 和 Infinity 会被拒绝）
+z.boolean();     // 验证值是否为 boolean
+z.bigint();      // 验证值是否为 bigint
+z.date();        // 验证值是否为 Date 对象（不是日期字符串）
+
+// 特殊类型
+z.null();        // 仅接受 null
+z.undefined();   // 仅接受 undefined
+z.any();         // 接受任何值（不验证，和 TS 的 any 一样）
+z.unknown();     // 接受任何值（但使用时需要收窄，和 TS 的 unknown 一样）
+z.never();       // 拒绝所有值（永远不会验证通过）
+
+// 字面量类型——验证值是否严格等于指定的值
+z.literal("hello");  // 只接受 "hello" 这一个字符串
+z.literal(42);       // 只接受数字 42
+z.literal(true);     // 只接受布尔值 true
+```
+
+### 14.6 字符串验证
+
+Zod 提供了丰富的字符串验证方法，无需手写正则表达式。这些方法可以链式调用，每个方法在前一个验证通过的基础上追加新的约束：
+
+```typescript
+// 长度约束
+z.string().min(3);           // 至少 3 个字符
+z.string().max(50);          // 最多 50 个字符
+z.string().length(10);       // 恰好 10 个字符
+
+// 格式约束——内置了常用的正则验证
+z.string().email();          // 必须是合法的邮箱格式
+z.string().url();            // 必须是合法的 URL
+z.string().uuid();           // 必须是合法的 UUID
+z.string().datetime();       // 必须是 ISO 8601 日期时间格式
+
+// 内容约束
+z.string().regex(/^[a-z]+$/); // 必须匹配正则表达式
+z.string().startsWith("http"); // 必须以指定前缀开头
+z.string().endsWith(".ts");    // 必须以指定后缀结尾
+
+// 变换——验证通过后对值进行转换（不是约束，而是修改输出）
+z.string().trim();           // 去除首尾空格后返回
+z.string().toLowerCase();    // 转为小写后返回
+```
+
+> 链式调用的顺序很重要：变换方法（如 `trim`）会先执行，后续的约束方法基于变换后的值进行验证。
+
+### 14.7 数字验证
+
+数字 schema 同样支持链式约束，用于限定数值的范围和格式：
+
+```typescript
+z.number().min(0);           // 值必须 >= 0
+z.number().max(100);         // 值必须 <= 100
+z.number().int();            // 值必须是整数（排除小数）
+z.number().positive();       // 值必须 > 0（等价于 .gt(0)）
+z.number().negative();       // 值必须 < 0
+z.number().multipleOf(5);    // 值必须是 5 的倍数
+z.number().finite();         // 值不能是 Infinity
+```
+
+> 这些约束方法对应的 TS 类型都是 `number`——Zod 只在运行时检查值是否满足约束，不会改变推断出的 TS 类型。
+
+### 14.8 对象、数组与枚举
+
+`z.object` 定义对象 schema，每个属性对应一个子 schema。对象的所有属性默认是**必填**的，用 `.optional()` 标记可选属性：
+
+```typescript
+// 对象——所有属性默认必填
+const UserSchema = z.object({
+  name: z.string(),
+  age: z.number(),
+});
+UserSchema.parse({ name: "Alice" });  // Error：缺少 age
+
+// 可选属性用 .optional()
+const ConfigSchema = z.object({
+  host: z.string(),              // 必填
+  port: z.number().optional(),   // 可选——允许不传或传 undefined
+});
+ConfigSchema.parse({ host: "localhost" });  // OK
+```
+
+`z.array` 定义数组 schema，泛型参数是元素的 schema。可以追加 `.min()` / `.max()` 约束数组长度：
+
+```typescript
+const TagsSchema = z.array(z.string()).min(1).max(10);
+// 数组至少 1 个元素、最多 10 个元素，且每个元素必须是 string
+TagsSchema.parse(["ts", "zod"]);  // OK
+TagsSchema.parse([]);             // Error：数组为空
+```
+
+`z.enum` 定义枚举 schema，限定值只能是字符串数组中的某一个。这对应 TS 的字面量联合类型：
+
+```typescript
+const ColorSchema = z.enum(["red", "green", "blue"]);
+ColorSchema.parse("red");     // OK
+// ColorSchema.parse("yellow"); // Error："yellow" 不在允许的值中
+
+// 推断出的 TS 类型是 "red" | "green" | "blue"
+type Color = z.infer<typeof ColorSchema>;
+```
+
+### 14.9 联合类型与可辨识联合
+
+`z.union` 对应 TS 的联合类型（`A | B`），验证时依次检查每个候选 schema，第一个通过的就返回：
+
+```typescript
+const IdSchema = z.union([z.string(), z.number()]);
+IdSchema.parse(42);        // OK：匹配 number
+IdSchema.parse("abc");     // OK：匹配 string
+// IdSchema.parse(true);   // Error：boolean 不在联合中
+```
+
+`z.discriminatedUnion` 对应 TS 的可辨识联合（Discriminated Union），根据一个"判别字段"快速定位到正确的分支，比 `z.union` 更高效也更精确。第七章的 `Shape` 示例用 Zod 表达就是：
+
+```typescript
+const ResultSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("success"), data: z.string() }),
+  z.object({ status: z.literal("error"), message: z.string() }),
+]);
+
+const result = ResultSchema.parse({ status: "success", data: "ok" });
+// result 的类型被 TS 自动收窄——访问 data 时不需要额外检查
+if (result.status === "success") {
+  console.log(result.data);   // OK：TS 知道 data 存在
+}
+```
+
+### 14.10 Transform 与默认值
+
+`.transform()` 让你在验证通过后对数据进行转换——验证和变换在同一步完成。transform 的返回值类型会成为 schema 的新输出类型：
+
+```typescript
+// 验证是 string，然后返回其去空格后的长度（number）
+const trimmedLength = z.string().transform((s: string) => s.trim().length);
+trimmedLength.parse("  hello  ");  // 5（类型是 number，不是 string）
+```
+
+`.default()` 为 schema 指定默认值——当输入为 `undefined` 时，自动使用默认值而不是报错：
+
+```typescript
+const schema = z.string().default("hello");
+schema.parse(undefined);  // "hello"——用默认值
+schema.parse("world");    // "world"——用传入的值
+```
+
+`.nullish()` 是 `.nullable().optional()` 的简写，同时允许 `null`、`undefined` 和正常值。在处理可能为 null 的 API 响应时非常有用：
+
+```typescript
+const nullableSchema = z.string().nullish();
+nullableSchema.parse(null);       // OK
+nullableSchema.parse(undefined);  // OK
+nullableSchema.parse("hi");       // OK
+// nullableSchema.parse(42);      // Error：number 不是 string
+```
+
+### 14.11 实战：验证 API 响应
+
+一个典型的使用场景：从外部 API 获取 JSON 数据，用 Zod 验证后安全使用：
+
+```typescript
+import { z } from "zod";
+
+// 定义期望的数据结构
+const PostSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  body: z.string(),
+  tags: z.array(z.string()),
+});
+
+type Post = z.infer<typeof PostSchema>;
+
+// 模拟 API 调用
+async function fetchPosts(): Promise<Post[]> {
+  const res = await fetch("https://api.example.com/posts");
+  const json = await res.json();
+
+  // 用 Zod 验证整个数组
+  return z.array(PostSchema).parse(json);
+}
+```
+
+> **Zod 官方文档**：https://zod.dev/ —— 完整 API 参考与更多示例。
 
 ---
 
@@ -2415,6 +2837,20 @@ type EventHandlers = `on${Capitalize<Events>}`;
   // alwaysStrict: true
 }
 ```
+
+### TypeScript 6.0 主要变更（2026 年发布）
+
+如果你使用 TypeScript 6.0+，以下编译选项默认值发生了变化：
+
+| 选项 | 5.x 默认值 | 6.0 默认值 | 影响 |
+|------|-----------|-----------|------|
+| `strict` | `false` | `true` | 新项目无需手动开启 |
+| `target` | `es3` | `es2025` | 输出更现代的 JS 语法 |
+| `esModuleInterop` | `false` | `true`（始终启用） | 无需手动设置 |
+| `moduleResolution` | `classic`/`node` | `nodenext` | `node` 已弃用，应使用 `nodenext` 或 `bundler` |
+| `types` | 自动包含所有 `@types` | `[]`（空） | 需手动指定 `@types` 包 |
+
+> 这些变更主要是为了让新项目的默认行为更现代化。核心语法（类型注解、泛型、联合类型等）不受影响。
 
 ---
 
@@ -2487,9 +2923,14 @@ npx tsc --init
 npm create vite@latest my-app -- --template react-ts
 ```
 
-### C.3 用 ts-node 直接运行 TS（开发时）
+### C.3 直接运行 TS（开发时）
 
 ```bash
+# 方式 1：tsx（推荐——更快，零配置）
+npm install -D tsx
+npx tsx src/index.ts
+
+# 方式 2：ts-node（经典方案）
 npm install -D ts-node
 npx ts-node src/index.ts
 ```
