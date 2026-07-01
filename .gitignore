@@ -6,3 +6,4 @@ dist/
 !tsconfig.json
 .env
 *.log
+example.ts

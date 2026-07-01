@@ -116,10 +116,12 @@ tsc hello.ts
 
 ```javascript
 function greet(person, date) {
-  console.log("Hello ".concat(person, ", today is ").concat(date.toDateString(), "!"));
+  console.log(`Hello ${person}, today is ${date.toDateString()}!`);
 }
 greet("Maddison", new Date());
 ```
+
+> 注意：模板字符串被保留了（因为目标是 ES2015+）。如果目标是 ES5，模板字符串会被转换为 `.concat()` 调用。
 
 用 Node 运行：
 
@@ -389,7 +391,7 @@ const matrix: number[][] = [[1, 2], [3, 4]];
 
 ### 4.4 联合类型（Union Types）
 
-联合类型用 `|` 表示一个值可以是几种类型之一——这是 TypeScript 中最常用的概念之一：
+联合类型用 `|` 表示一个值可以是几种类型之一。实际编程中，一个值往往不只有一种可能——用户 ID 可能是数字（数据库自增）也可能是字符串（UUID），函数参数可能接受数组或单个值。联合类型让你精确描述这种"多选一"的场景：
 
 ```typescript
 // id 可以是 string 或 number
@@ -399,62 +401,66 @@ function printId(id: number | string) {
 
 printId(101);     // OK
 printId("202");   // OK
-// printId({ id: 123 });  // Error
+// printId({ id: 123 });  // Error: { id: number } 不在联合类型中
 ```
 
-有了联合类型，TS 只允许**所有成员共有**的操作：
+有了联合类型，TS 只允许**所有成员共有**的操作。如果你想在某个分支中使用特定类型的方法，需要用条件语句将类型收窄到具体成员——这就是**类型收窄**（Narrowing），将在第七章详细讲解：
 
 ```typescript
 function printId(id: number | string) {
-  // id.toUpperCase();  // Error: 只有 string 有 toUpperCase，number 没有
+  // id.toUpperCase();  // Error: number 没有 toUpperCase 方法
   // 需要用条件语句收窄类型后才能使用特定操作
   if (typeof id === "string") {
-    console.log(id.toUpperCase());  // OK
+    console.log(id.toUpperCase());  // OK：这里 id 已被收窄为 string
   } else {
-    console.log(id);                // OK
+    console.log(id);                // OK：这里 id 已被收窄为 number
   }
 }
 ```
 
-> **与其他语言对比**：
-> - Python: `Union[int, str]`（需要导入 `typing` 模块）
-> - Java: 不直接支持，通常用接口+多态实现类似效果
-> - TS: `number | string`（原生支持，语法简洁）
+> **与其他语言对比**：Python 用 `Union[int, str]`（需从 `typing` 模块导入），Java/C++ 不直接支持、通常用接口+多态实现类似效果，而 TS 的 `number | string` 语法简洁且原生支持。
 
 ### 4.5 类型别名（Type Aliases）
 
-`type` 可以给类型起名字，让代码更清晰：
+当同一个类型在多处使用时，直接写完整类型既冗长又容易出错。`type` 关键字允许你给任意类型起一个名字，之后用这个名字来引用——一处定义、多处引用，修改时也只需改一个地方：
 
 ```typescript
-// 命名联合类型
+// 命名联合类型——避免重复写 number | string
 type ID = number | string;
 
-// 命名对象类型
+// 命名对象类型——描述一个坐标点的形状
 type Point = {
   x: number;
   y: number;
 };
 
-// 命名函数类型
+// 命名函数类型——统一事件处理函数的签名
 type Handler = (event: string) => void;
 
-// 使用
+// 使用别名让函数签名更清晰
 function printCoord(pt: Point) {
   console.log(pt.x, pt.y);
 }
+
+// 注意：别名只是"外号"，不是新类型
+let myId: ID = 42;     // OK
+myId = "abc";          // 也 OK——ID 就是 number | string
 ```
+
+> **与 `interface` 的区别**：`type` 可以为任何类型起名（联合类型、原始类型、函数类型等），而 `interface` 只能描述对象类型。详见第六章。
 
 ### 4.6 `any` —— 逃生舱
 
+`any` 是 TypeScript 中最宽松的类型——它可以赋值为任何类型，也可以调用任何方法、访问任何属性，编译器不会报错。当你从纯 JS 迁移到 TS，或者使用没有类型定义的第三方库时，`any` 让你不必一次性给所有代码加类型，是一条渐进式引入类型的"逃生通道"。但另一方面，`any` 等于关闭了该值的所有类型检查，拼写错误、参数遗漏、类型不匹配等问题都不会被发现，和写纯 JS 没有区别：
+
 ```typescript
 let value: any = 42;
-value = "hello";     // 可以重新赋值为任何类型
-value.toUpperCase(); // 不会报错（即使运行时可能出错）
+value = "hello";     // OK：any 可以赋值为任何类型
+value.toUpperCase(); // 不会报错——但运行时如果 value 是数字就会崩溃
+value.foo.bar.baz;   // 也不会报错——完全放弃了检查
 ```
 
-`any` 关闭了所有类型检查，相当于回到纯 JS。**尽量避免使用**。
-
-使用 `noImplicitAny` 编译选项可以阻止隐式的 `any`：
+使用 `noImplicitAny` 编译选项可以阻止**隐式**的 `any`（即没写类型注解且 TS 推断不出时默认为 `any` 的情况）：
 
 ```json
 // tsconfig.json
@@ -465,69 +471,116 @@ value.toUpperCase(); // 不会报错（即使运行时可能出错）
 }
 ```
 
-有了这个设置，如果 TS 无法推导出类型且你没有显式标注，就会报错。
+> **建议**：新项目始终开启 `noImplicitAny`。如果实在不知道某个值的类型，优先用 `unknown` 而不是 `any`。
 
 ### 4.7 `unknown` —— 安全的 any
+
+`unknown` 和 `any` 一样可以接收任何类型的值，但关键区别在于——你**不能直接使用** `unknown` 类型的值，必须先用类型守卫（如 `typeof` 检查）收窄类型后才能操作它。这让 `unknown` 成为 `any` 的安全替代品：允许接收任意值，但强制你在使用前先确认类型：
 
 ```typescript
 let value: unknown = 42;
 value = "hello";
 
-// 不能直接使用 unknown 类型的值 —— 必须先收窄类型
+// value.toUpperCase();  // Error: 不能直接使用 unknown
+
+// 必须先收窄类型
 if (typeof value === "string") {
-  console.log(value.toUpperCase()); // OK
+  console.log(value.toUpperCase()); // OK：此时 value 已被确认为 string
 }
 ```
 
+**`any` vs `unknown` 对比**：
+
+| 特性 | `any` | `unknown` |
+|------|-------|-----------|
+| 可以赋值为任何类型 | ✓ | ✓ |
+| 可以直接调用方法 | ✓（不检查） | ✗（必须先收窄） |
+| 类型安全性 | 无 | 有 |
+
 ### 4.8 `void`、`never` 和 `undefined`
 
+这三个类型都与"没有值"有关，但使用场景截然不同。
+
+**`void` —— 函数不返回值**
+
+`void` 表示函数的返回值不会被使用。大多数不写 `return` 的函数，返回类型都可以标注为 `void`。它和 `undefined` 的区别在于：`void` 是告诉调用者"不要使用返回值"，而 `undefined` 是一个具体的值。
+
 ```typescript
-// void —— 函数不返回值
+// void 表示这个函数的返回值没有意义
 function log(msg: string): void {
   console.log(msg);
 }
 
-// never —— 函数永远不会返回（抛出异常或无限循环）
+// 一个常见误区：返回类型为 void 的函数，其实现可以返回 undefined
+// 但调用者不应该使用这个返回值
+type VoidFn = () => void;
+const f: VoidFn = () => true;  // 允许——void 忽略返回值
+const result = f();             // result 的类型是 void，不是 boolean
+```
+
+**`never` —— 函数永远不会返回**
+
+`never` 表示函数永远不会正常结束。两种典型场景：抛出异常（函数终止）或无限循环（函数永不返回）。和 `void` 的区别：`void` 表示"函数正常结束但没有返回值"，`never` 表示"函数根本不会正常结束"。
+
+```typescript
+// 抛出异常——函数在 throw 之后就终止了，不可能有返回值
 function throwError(msg: string): never {
   throw new Error(msg);
 }
 
-// undefined —— 未定义
+// 无限循环——永远执行下去，不会返回
+function infiniteLoop(): never {
+  while (true) { }
+}
+```
+
+`never` 还有一个重要用途：穷尽性检查（Exhaustiveness Checking）。当你处理联合类型的所有分支后，剩余类型应该是 `never`——如果还有未处理的分支，TS 会在编译时报错。详见第七章。
+
+**`undefined` —— 作为类型使用**
+
+`undefined` 既是一个值，也是一个类型。当它作为类型使用时，通常出现在可选参数的场景中——`name?: string` 的实际类型是 `string | undefined`，表示"可能有值，也可能是 undefined"：
+
+```typescript
 function printName(name?: string): void {
-  // name 可能是 string 或 undefined
+  // name 的类型是 string | undefined
+  // 必须检查后才能安全使用
+  if (name !== undefined) {
+    console.log(name.toUpperCase());
+  }
 }
 ```
 
 ### 4.9 字面量类型（Literal Types）
 
-特定的值本身也可以作为类型，这在限定函数参数为固定值集合时非常有用：
+`string`、`number` 这类宽泛类型表示"任意字符串"或"任意数字"。但有时你需要更精确的约束——比如一个参数只能是 `"left"`、`"right"` 或 `"center"` 三个值之一。字面量类型让你用具体的值本身作为类型，组合起来就能限定一个值的可选范围：
 
 ```typescript
-// 字符串字面量类型
+// 字符串字面量联合——方向只能是这四个值之一
 type Direction = "left" | "right" | "up" | "down";
 
-// 数字字面量类型
+// 数字字面量联合——骰子只能是 1-6
 type DiceRoll = 1 | 2 | 3 | 4 | 5 | 6;
 
-// 布尔字面量类型（其实就是 boolean）
+// boolean 其实就是 true | false 的别名
 type IsActive = true | false;
 ```
 
-**实用场景**：
+实际使用中，最常见的场景是用字面量联合限定函数参数：
 
 ```typescript
 function setAlignment(align: "left" | "center" | "right") {
-  // ...
+  // align 只能是这三个字符串之一
 }
 setAlignment("left");      // OK
 // setAlignment("middle"); // Error: "middle" 不在允许的字面量中
 ```
 
-**字面量推断问题**：TS 会把 `const` 声明的变量推断为字面量类型，但对象属性会被拓宽为宽泛类型：
+**字面量推断**：TS 会把 `const` 声明的变量推断为字面量类型，但对象属性会被**拓宽**为宽泛类型。这是因为 TS 需要同时支持读取和写入——对象属性将来可能被重新赋值为其他值，所以不能假定它永远是某个字面量：
 
 ```typescript
 const req = { url: "https://example.com", method: "GET" };
-// req.method 被推断为 string，不是 "GET"
+// req.method 的类型是 string，不是 "GET"
+// 因为 TS 允许后续写 req.method = "POST"，所以不能窄化为字面量
 
 function handleRequest(url: string, method: "GET" | "POST") { }
 
@@ -536,19 +589,88 @@ handleRequest(req.url, req.method);
 // Error: string 不能赋值给 "GET" | "POST"
 ```
 
-**解法**：用 `as const` 让整个对象的所有属性都被推断为字面量类型：
+解决方法是用 `as const` 断言。`as const` 告诉 TS"这个对象的所有属性都是只读的，类型就是字面量本身"，从而阻止拓宽：
 
 ```typescript
 const req2 = { url: "https://example.com", method: "GET" } as const;
-// req2.method 的类型是 "GET"，不再是 string
+// req2.method 的类型是 "GET"（字面量类型），不再是 string
+// req2 整体也是只读的，不能修改任何属性
 handleRequest(req2.url, req2.method);  // OK
 ```
 
-### 4.10 `enum` —— 枚举类型
+### 4.10 `as const` —— 断言字面量类型
 
-`enum` 是 TypeScript 提供的一组命名常量，允许你定义一组有限的可选值。与大多数 TS 特性不同，`enum` 不是纯类型层面的——编译后会生成真实的对象。
+上一节的字面量推断问题揭示了一个普遍需求：你经常需要让一个对象的所有属性都被推断为字面量类型，而不是被拓宽为宽泛类型。`as const` 就是为此而生的。
+
+**`as const` 做了两件事**：
+
+1. **阻止类型拓宽**：把每个属性的类型锁定为字面量本身，而不是 `string`、`number` 这样的宽泛类型
+2. **标记为只读**：整个对象（包括嵌套对象和数组）的所有属性都变为 `readonly`，不能修改
 
 ```typescript
+// 没有 as const——属性被拓宽为宽泛类型
+const obj1 = { x: 10, y: "hello" };
+// obj1 的类型是 { x: number; y: string }
+
+// 有 as const——属性被锁定为字面量类型
+const obj2 = { x: 10, y: "hello" } as const;
+// obj2 的类型是 { readonly x: 10; readonly y: "hello" }
+// obj2.x = 20;  // Error: 只读属性不能修改
+```
+
+**数组也会被锁定**：
+
+```typescript
+const arr1 = [1, 2, 3];
+// arr1 的类型是 number[]——可以 push、pop、修改元素
+
+const arr2 = [1, 2, 3] as const;
+// arr2 的类型是 readonly [1, 2, 3]——固定长度、固定类型、不可修改
+// arr2.push(4);  // Error: readonly 数组没有 push 方法
+// arr2[0] = 99;  // Error: 不能修改只读元素
+```
+
+**嵌套对象也会递归锁定**：
+
+```typescript
+const config = {
+  api: { url: "https://example.com", timeout: 5000 },
+  debug: true,
+} as const;
+// config.api.url 的类型是 "https://example.com"（字面量），不是 string
+// config.api 和 config 本身都是 readonly
+```
+
+**常见用法**：
+
+```typescript
+// 1. 限定函数参数为固定值集合（配合枚举替代方案）
+const Direction = { Up: 0, Down: 1, Left: 2, Right: 3 } as const;
+type Direction = (typeof Direction)[keyof typeof Direction];
+// Direction 的类型是 0 | 1 | 2 | 3
+
+// 2. 创建不可变的配置对象
+const defaultConfig = {
+  apiUrl: "https://api.example.com",
+  timeout: 5000,
+  retries: 3,
+} as const;
+// defaultConfig.apiUrl 的类型是 "https://api.example.com"，不是 string
+
+// 3. 让元组类型更精确
+const pair = ["hello", 42] as const;
+// pair 的类型是 ["hello", 42]——固定长度、固定位置类型
+// pair[0].toUpperCase();  // OK：TS 知道 pair[0] 是 "hello"
+```
+
+> **`as const` vs `readonly`**：`readonly` 只标记属性为只读，不阻止类型拓宽（`readonly x: number`）。`as const` 既标记为只读，又锁定为字面量类型（`readonly x: 10`）。`as const` 是 `readonly` 的"完全体"。
+
+### 4.11 `enum` —— 枚举类型
+
+当一个变量只能取几个固定的值时，用字符串字面量（如 `"up"` / `"down"`）容易拼错，也缺乏自动补全。枚举（`enum`）为这组固定的值提供有意义的名字。与大多数 TS 特性不同，`enum` 不是纯类型层面的——编译后会生成真实的 JS 对象，因此有运行时开销：
+
+```typescript
+// 数字枚举：成员自动从 0 开始编号
 enum Direction {
   Up,      // 0
   Down,    // 1
@@ -556,38 +678,44 @@ enum Direction {
   Right,   // 3
 }
 
-// 数字枚举：可指定起始值
+// 也可以手动指定起始值
 enum StatusCode {
   OK = 200,
   NotFound = 404,
   InternalError = 500,
 }
 
-// 字符串枚举
+// 字符串枚举：每个成员必须显式赋值为字符串
 enum Color {
   Red = "RED",
   Green = "GREEN",
   Blue = "BLUE",
 }
 
-// 使用
+// 使用枚举值
 function move(direction: Direction) {
-  console.log(Direction[direction]); // 反向映射（仅数字枚举支持）
+  console.log(Direction[direction]); // 反向映射：0 → "Up"（仅数字枚举支持）
 }
-move(Direction.Up);
+move(Direction.Up);  // 输出 "Up"
 ```
 
-> ⚠️ **反向映射**（`Direction[direction]`）仅对数字枚举有效。字符串枚举**不会**生成反向映射。
+> ⚠️ **反向映射**（`Direction[direction]`）仅对数字枚举有效。字符串枚举**不会**生成反向映射。反向映射是数字枚举特有的运行时行为——编译后生成的对象同时支持 `Direction.Up → 0` 和 `Direction[0] → "Up"` 两种查找。
 
-**最佳实践**：`enum` 有运行时开销（会生成 JS 对象）。如果你只需要一组字面量常量，优先使用 `as const` + 联合类型：
+**`enum` vs `as const`**：`enum` 会生成真实的 JS 对象，有运行时开销。如果你只需要一组命名常量而不需要反向映射，可以用 `as const` + 联合类型替代，效果相同但不产生运行时代码：
 
 ```typescript
-// 推荐方式（无运行时开销）
+// 方式 1：enum（有运行时开销）
+enum Direction {
+  Up, Down, Left, Right,
+}
+
+// 方式 2：as const（无运行时开销，编译后完全擦除）
 const Direction = { Up: 0, Down: 1, Left: 2, Right: 3 } as const;
 type Direction = (typeof Direction)[keyof typeof Direction];
+// Direction 的类型是 0 | 1 | 2 | 3
 ```
 
-> 更多细节见官方 Enums 参考：https://www.typescriptlang.org/docs/handbook/enums.html
+> 枚举是一个存在争议的特性——官方文档建议"了解它存在，但除非确定需要，否则优先用 `as const`"。更多细节见：https://www.typescriptlang.org/docs/handbook/enums.html
 
 ---
 
@@ -595,72 +723,106 @@ type Direction = (typeof Direction)[keyof typeof Direction];
 
 ### 5.1 参数类型和返回值类型
 
+TypeScript 允许你为函数的每个参数和返回值指定类型。参数类型写在参数名后面，返回值类型写在参数列表的 `)` 后面：
+
 ```typescript
-// 完整注解
+// 完整注解：name 是 string，age 是 number，返回 string
 function greet(name: string, age: number): string {
   return `Hello, my name is ${name}, I'm ${age}`;
 }
+
+// 大多数情况下返回值类型可以省略，TS 会自动推断
+function add(a: number, b: number) {
+  return a + b;  // 返回类型自动推断为 number
+}
 ```
+
+> **最佳实践**：对于简单的函数，省略返回值类型让代码更简洁；对于公开的 API 或复杂的函数，显式标注返回值类型可以防止意外修改返回值。
 
 ### 5.2 可选参数与默认参数
 
+不是每个参数每次调用都必须传。可选参数用 `?` 标记，表示调用时可以省略；默认参数用 `= 值` 指定，省略时自动使用默认值：
+
 ```typescript
-// 可选参数（用 ?）
+// 可选参数（用 ?）—— greeting 可传可不传
 function greetOptional(name: string, greeting?: string): string {
-  return `${greeting ?? "Hello"}, ${name}`;   // ?? 是空值合并运算符
+  return `${greeting ?? "Hello"}, ${name}`;
+  // ?? 是"空值合并"运算符：只有左边是 null/undefined 时才用右边的值
 }
 
-// 默认参数（和 JS 一样）
+greetOptional("Alice");           // "Hello, Alice"
+greetOptional("Alice", "Hi");     // "Hi, Alice"
+
+// 默认参数——greeting 不传时自动用 "Hello"
 function greetDefault(name: string, greeting: string = "Hello"): string {
   return `${greeting}, ${name}`;
 }
 
-// 可选参数必须在必选参数之后
+// 可选参数必须放在必选参数之后
 function f(a: string, b?: number, c?: boolean): void { }
+// f("hello")        // OK
+// f("hello", 42)    // OK
+// f("hello", 42, true) // OK
+// f(?, "hello")     // Error：必选参数不能在可选参数后面
 ```
-
-> `??`（nullish coalescing）只在左操作数为 `null` 或 `undefined` 时返回右操作数。`||` 在左操作数为任何 falsy 值（`""`、`0`、`false`）时都会返回右操作数。
 
 ### 5.3 剩余参数
 
+剩余参数（Rest Parameters）用 `...` 语法让函数接收任意数量的参数，这些参数被打包成一个数组。当你不知道调用者会传多少个参数时，剩余参数比定义大量可选参数更灵活：
+
 ```typescript
+// ...nums 把所有传入的数字收集到 nums 数组中
 function sum(...nums: number[]): number {
   return nums.reduce((total, n) => total + n, 0);
 }
-sum(1, 2, 3); // 6
+sum(1, 2, 3);     // 6
+sum(10, 20);       // 30
+sum();             // 0
 ```
 
 ### 5.4 函数类型表达式
 
+函数类型表达式用 `(参数) => 返回值` 的语法描述一个函数的形状。当你需要把函数作为参数传递（回调函数）或存储在变量中时，就需要这种方式：
+
 ```typescript
-// 将函数签名声明为类型
+// 把函数签名声明为类型
 type GreetFn = (name: string, age: number) => string;
 
+// 用类型注解约束变量
 const greet: GreetFn = (name, age) => {
   return `Hi ${name}, age ${age}`;
+  // 参数类型可以从 GreetFn 推断，不必重复写
 };
+
+// 也可以直接用在函数参数中
+function doSomething(fn: (x: number) => void) {
+  fn(42);
+}
 ```
 
 ### 5.5 回调函数的参数类型
 
+上下文类型（Contextual Typing）是 TypeScript 的一项特性——当你把一个函数作为参数传递给另一个函数时，TS 会根据目标函数的签名自动推断回调参数的类型。这让你不必在每个回调中重复写类型注解，同时仍能享受类型检查的好处：
+
 ```typescript
-// 数组的 forEach 方法会自动推断回调参数的类型
+// 数组的 forEach 方法签名是 (callback: (value: T) => void) => void
+// TS 知道数组元素是 string，所以自动推断 name 的类型
 const names = ["Alice", "Bob", "Eve"];
 names.forEach((name) => {
-  console.log(name.toUpperCase()); // name 自动推断为 string
+  console.log(name.toUpperCase()); // name 自动推断为 string——不需要写 (name: string)
 });
 ```
 
-这被称为**上下文类型**（contextual typing）—— TS 根据函数的调用上下文推断参数类型。
-
 ### 5.6 函数重载
 
+函数重载允许一个函数根据不同的参数类型和数量有不同的签名。TypeScript 的重载是**编译时**的——你在函数上方写多个签名声明，下方写一个统一的实现。有些函数根据输入不同，返回值类型也不同，用联合类型无法精确表达，这时就需要重载：
+
 ```typescript
-// 定义多个函数签名（只有声明，没有实现）
+// 重载签名（只有声明，没有实现）——定义了两种合法的调用方式
 function makeDate(timestamp: number): Date;
 function makeDate(year: number, month: number, day: number): Date;
 
-// 实际实现
+// 实现签名（外部不可见）——处理所有重载分支
 function makeDate(arg1: number, arg2?: number, arg3?: number): Date {
   if (arg2 !== undefined && arg3 !== undefined) {
     return new Date(arg1, arg2, arg3);
@@ -668,11 +830,13 @@ function makeDate(arg1: number, arg2?: number, arg3?: number): Date {
   return new Date(arg1);
 }
 
-makeDate(1234567890);        // OK
-makeDate(2024, 6, 30);       // OK
+makeDate(1234567890);        // OK：匹配第一个重载
+makeDate(2024, 6, 30);       // OK：匹配第二个重载
 // @ts-expect-error
-makeDate(2024, 6);           // Error: 没有匹配的重载
+makeDate(2024, 6);           // Error：没有匹配的重载（1 个或 3 个参数，不能 2 个）
 ```
+
+> **注意**：实现签名在外部不可见——调用者只能看到上面的重载签名。重载的实现签名必须与所有重载签名兼容。
 
 ### 5.7 调用签名（Call Signatures）
 
@@ -918,45 +1082,59 @@ const admins = db.filterUsers(function (this: User) {
 
 ### 6.1 对象类型注解
 
+对象类型描述了一个对象应该有哪些属性、每个属性是什么类型。你可以直接内联写在参数注解中，也可以用 `type` 或 `interface` 命名后复用。描述对象的"形状"是 TypeScript 最核心的用途之一——它让你在调用函数前就知道该传什么样的对象：
+
 ```typescript
-// 直接内联注解
+// 内联对象类型：pt 必须有 x 和 y，都是 number
 function printCoord(pt: { x: number; y: number }) {
   console.log(`x: ${pt.x}, y: ${pt.y}`);
 }
+
+printCoord({ x: 3, y: 7 });  // OK
+// printCoord({ x: 3 });      // Error: 缺少 y 属性
 ```
 
 ### 6.2 可选属性
 
+用 `?` 标记的属性表示该属性可以不存在。现实中的对象往往不是所有属性都有值——比如用户信息中，昵称是必填的，但真实姓名可能是空的。读取可选属性时，类型是 `T | undefined`，需要先检查才能安全使用：
+
 ```typescript
 function printName(obj: { first: string; last?: string }) {
-  // 访问可选属性前需要检查 undefined
-  console.log(obj.last?.toUpperCase());  // ?. 可选链（Optional Chaining）
-  
-  // 或者
+  // 方法 1：可选链 ?.（推荐——简洁安全）
+  console.log(obj.last?.toUpperCase());
+  // 如果 obj.last 是 undefined，整个表达式返回 undefined，不会报错
+
+  // 方法 2：手动检查
   if (obj.last !== undefined) {
     console.log(obj.last.toUpperCase());
   }
 }
-```
 
-> `?.` 是可选链运算符：如果 `obj.last` 是 `null` 或 `undefined`，表达式短路返回 `undefined`，不会抛出错误。
+printName({ first: "Bob" });                // OK：last 是可选的
+printName({ first: "Alice", last: "Alisson" });  // OK
+```
 
 ### 6.3 只读属性
 
+`readonly` 修饰符标记一个属性为只读——创建后不能重新赋值。这只在编译时检查，运行时不影响行为。它既是防止意外修改的保护措施，也是一种文档——告诉阅读代码的人"这个值不应该被修改"：
+
 ```typescript
 interface Point {
-  readonly x: number;  // 只能在创建时赋值
-  y: number;
+  readonly x: number;  // 只读：创建后不能修改
+  y: number;           // 可读可写
 }
 
 const p: Point = { x: 10, y: 20 };
+p.y = 30;             // OK
 // @ts-expect-error
-p.x = 5;  // Error: Cannot assign to 'x' because it is a read-only property
+p.x = 5;              // Error: Cannot assign to 'x' because it is a read-only property
 ```
+
+> **注意**：`readonly` 只防止重新赋值（`p.x = 5`），不防止修改对象内部的属性（如 `p.point.x = 5` 如果 point 是对象的话）。
 
 ### 6.4 Type 别名
 
-`type` 为类型起个名字，可以用在任何类型上（原始类型、联合类型、对象类型等）：
+`type` 关键字为类型起一个名字，之后可以用这个名字来引用。当同一个类型在多处使用时，避免重复写完整的类型定义，详见第四章 4.5 节：
 
 ```typescript
 // 命名对象类型
@@ -978,7 +1156,7 @@ function printCoord(pt: Point) {
 
 ### 6.5 Interface 声明
 
-`interface` 是另一种命名对象类型的方式：
+`interface` 是另一种命名对象类型的方式，语法与 `type` 类似但有一些关键区别。`interface` 支持声明合并（同名的 interface 自动合并），这在扩展第三方库的类型时非常有用：
 
 ```typescript
 interface Point {
@@ -1406,13 +1584,9 @@ function area(shape: Shape): number {
 
 ### 7.4 穷尽性检查（Exhaustiveness Checking）与 `never`
 
-处理完联合的所有变体后，剩余类型应该是 `never`（不可能发生）。用 `never` 做编译时检查：
+处理完联合的所有变体后，剩余类型应该是 `never`（不可能发生）。用 `never` 做编译时检查，可以保证你处理了联合类型的每一个变体：
 
 ```typescript
-function assertNever(x: never): never {
-  throw new Error("Unexpected value: " + x);
-}
-
 type Shape =
   | { kind: "circle"; radius: number }
   | { kind: "rectangle"; width: number; height: number }
@@ -1427,13 +1601,15 @@ function area(shape: Shape): number {
     case "triangle":
       return (shape.base * shape.height) / 2;
     default:
-      return assertNever(shape);
+      const _exhaustiveCheck: never = shape;
+      return _exhaustiveCheck;
   }
 }
 
 // 如果以后扩展 Shape：
 // | { kind: "square"; side: number };
-// TS 在 default 分支报错——提示你更新 area 函数
+// TS 在 default 分支报错：Type 'Square' is not assignable to type 'never'
+// ——提示你更新 area 函数
 ```
 
 这就是**穷尽性检查**——保证处理了联合类型的每一个变体。
@@ -1588,28 +1764,40 @@ palette.green.toUpperCase();
 
 ### 9.1 为什么需要泛型
 
+假设你要写一个"返回传入值"的函数。为每种类型写一个版本显然太冗余，而用 `any` 又会丢失类型信息：
+
 ```typescript
-// 没有泛型：只能写死一种类型
+// 方案 1：为每种类型写一个函数——代码重复
 function identityNumber(arg: number): number { return arg; }
 function identityString(arg: string): string { return arg; }
 
-// 或用 any 丢失类型信息
+// 方案 2：用 any——丢失了类型信息
 function identityAny(arg: any): any { return arg; }
-// 返回值类型也是 any —— 失去了类型保护
+// 调用 identityAny("hello") 返回的类型是 any，不是 string
+```
+
+泛型（Generics）用一个"类型占位符"替代具体类型，在调用时再填充，既不重复也不丢失类型信息：
+
+```typescript
+function identity<T>(arg: T): T { return arg; }
+// T 是类型参数，调用时自动推断为实际类型
 ```
 
 ### 9.2 泛型函数
+
+泛型函数在函数名后用 `<T>` 声明一个类型参数，这个参数可以在参数类型和返回值类型中使用。大多数情况下 TS 能自动推断类型参数，不必手动指定：
 
 ```typescript
 function identity<T>(arg: T): T {
   return arg;
 }
 
-// 显式指定类型参数
-const output = identity<string>("hello");
+// 方式 1：显式指定类型参数
+const output = identity<string>("hello");  // 指定 T = string
 
-// 类型参数由 TS 自动推断
-const output2 = identity("hello");  // T 自动推断为 string
+// 方式 2：让 TS 自动推断（更常用）
+const output2 = identity("hello");  // TS 从参数 "hello" 推断 T = string
+// output2 的类型是 string
 ```
 
 ### 9.3 多个类型参数
@@ -1624,20 +1812,24 @@ const p = pair("hello", 42);  // 类型为 [string, number]
 
 ### 9.4 泛型约束
 
+默认情况下，泛型参数可以是任何类型。但如果你需要在函数内部访问某些属性（如 `.length`），就需要用 `extends` 关键字约束类型参数必须满足某个条件：
+
 ```typescript
+// 定义约束接口
 interface Lengthwise {
   length: number;
 }
 
-// T 必须包含 length 属性
+// T extends Lengthwise 表示 T 必须有 length 属性
 function logLength<T extends Lengthwise>(arg: T): T {
-  console.log(arg.length);
+  console.log(arg.length);  // OK：T 保证有 length
   return arg;
 }
 
 logLength("hello");      // OK：string 有 length
 logLength([1, 2, 3]);    // OK：array 有 length
-// logLength(42);        // Error：number 没有 length
+logLength({ length: 10, value: 3 });  // OK：对象有 length
+// logLength(42);        // Error：number 没有 length 属性
 ```
 
 ### 9.5 泛型接口与泛型别名
@@ -1659,7 +1851,7 @@ const r2: Result<string> = { success: false, error: "Not found" };
 
 ### 9.6 泛型类
 
-类也可以使用泛型参数：
+类也可以使用泛型参数。比如一个栈（Stack）数据结构，既可以存数字也可以存字符串——用泛型可以写一个通用的 Stack，而不是为每种类型写一个：
 
 ```typescript
 class Stack<T> {
@@ -1678,11 +1870,13 @@ class Stack<T> {
   }
 }
 
+// 数字栈——只能 push/pop number
 const numStack = new Stack<number>();
 numStack.push(1);
 numStack.push(2);
 console.log(numStack.pop());  // 2
 
+// 字符串栈——只能 push/pop string
 const strStack = new Stack<string>();
 strStack.push("hello");
 console.log(strStack.pop());  // "hello"
@@ -1740,31 +1934,52 @@ class Animal {
 
 ### 10.3 参数属性简写
 
+普通的类构造函数往往充满重复的 `this.xxx = xxx` 赋值。TypeScript 允许在构造函数参数前加 `public`/`private`/`protected`/`readonly` 修饰符，TS 会自动创建同名属性并赋值，省去手动赋值的样板代码：
+
 ```typescript
-// 上面的 constructor 可以简写为：
+// 传统写法：需要声明属性 + 构造函数参数 + 手动赋值
+class Animal {
+  public name: string;
+  private age: number;
+  protected species: string;
+
+  constructor(name: string, age: number, species: string) {
+    this.name = name;
+    this.age = age;
+    this.species = species;
+  }
+}
+
+// 参数属性简写：一行搞定
 class Animal {
   constructor(
-    public name: string,
-    private age: number,
-    protected species: string
+    public name: string,      // 自动创建 public name 属性并赋值
+    private age: number,      // 自动创建 private age 属性并赋值
+    protected species: string // 自动创建 protected species 属性并赋值
   ) {
-    // 无需显式赋值，TS 自动创建同名属性
+    // 不需要写 this.name = name，TS 自动处理
   }
 }
 ```
 
 ### 10.4 `readonly`
 
+`readonly` 修饰符让属性只能在构造函数中赋值，之后不能修改。适合保护不应该改变的值（如配置、ID 等）：
+
 ```typescript
 class Config {
   readonly apiKey: string;
 
   constructor(apiKey: string) {
-    this.apiKey = apiKey;
+    this.apiKey = apiKey;  // 构造函数中可以赋值
   }
 }
 
-// 或简写
+const config = new Config("abc-123");
+console.log(config.apiKey);  // "abc-123"
+// config.apiKey = "xyz";    // Error: Cannot assign to 'apiKey' because it is a read-only property
+
+// 或用参数属性简写
 class ConfigShort {
   constructor(readonly apiKey: string) { }
 }
@@ -1772,7 +1987,7 @@ class ConfigShort {
 
 ### 10.5 存取器（Getters / Setters）
 
-存取器允许你用属性的语法来调用自定义的读取/设置逻辑，隐藏内部实现细节：
+存取器（Accessors）让你用属性的语法来自定义读取和设置逻辑。当你想在读取或修改属性时执行一些逻辑（如类型转换、验证、计算），但又想保持属性访问的简洁语法时，就用 getter/setter：
 
 ```typescript
 class Temperature {
@@ -1782,50 +1997,55 @@ class Temperature {
     this._celsius = celsius;
   }
 
+  // getter：读取时自动转换为华氏度
   get fahrenheit(): number {
     return this._celsius * 9 / 5 + 32;
   }
 
+  // setter：设置华氏度时自动转换为摄氏度
   set fahrenheit(value: number) {
     this._celsius = (value - 32) * 5 / 9;
   }
 }
 
 const t = new Temperature(100);
-console.log(t.fahrenheit);  // 212 —— 像属性一样读取
+console.log(t.fahrenheit);  // 212 —— 像属性一样读取，不需要 t.fahrenheit()
 t.fahrenheit = 32;          // 像属性一样设置
 console.log(t.fahrenheit);  // 32 —— 通过 getter 读取转换后的值
 ```
 
-> **注意**：存取器的 getter 不带括号调用（`t.fahrenheit` 而不是 `t.fahrenheit()`），使用时看起来和普通属性完全一样。
-
 ### 10.6 `private` vs `#`（硬私有）
 
-TypeScript 的 `private` 是**软私有**——只在编译时检查，运行时仍可通过方括号访问：
+TypeScript 的 `private` 和 JavaScript 原生的 `#` 都用于限制属性访问，但私有程度不同——`private` 只是"君子协定"，`#` 才是真正的私有：
 
 ```typescript
 class Secret {
-  private code = "1234";
+  private code = "1234";  // TS 的"软私有"
 }
 
 const s = new Secret();
-// s.code;           // 编译报错
-(s as any).code;     // 运行时可以绕过——这就是"软私有"
+// s.code;           // 编译报错：code 是 private
+(s as any).code;     // 运行时可以绕过！这就是"软私有"
 ```
 
-如果你需要**硬私有**（运行时也无法访问），使用 JS 原生的 `#` 前缀：
+使用 JS 原生的 `#` 前缀实现**硬私有**：
 
 ```typescript
 class RealSecret {
-  #code = "1234";
+  #code = "1234";  // JS 原生的"硬私有"
+
+  getCode() {
+    return this.#code;  // 内部可以访问
+  }
 }
 
 const r = new RealSecret();
-// r.#code;          // 编译报错
-(r as any).#code;    // 运行时也报错——真正的私有
+r.getCode();          // OK
+// r.#code;           // 编译报错
+// (r as any).#code;  // 运行时也报错——真正的私有
 ```
 
-> **建议**：如果只是团队内部约定，`private` 足够；如果需要防止恶意绕过，使用 `#`。
+> **建议**：如果只是团队内部约定，`private` 足够；如果需要防止恶意绕过（如库的内部实现），使用 `#`。
 
 ### 10.7 继承
 
@@ -1855,27 +2075,35 @@ class Dog extends Animal {
 
 ### 10.8 抽象类
 
+抽象类（Abstract Class）不能直接实例化，只能被继承。它可以包含抽象方法（没有实现，子类必须实现）和具体方法（有实现，子类可以直接使用）。当你有一组相关的类共享某些行为，但每个类的具体实现不同时，抽象类定义公共的接口和部分实现，子类负责补充剩余的实现：
+
 ```typescript
 abstract class Shape {
-  abstract area(): number;       // 抽象方法：子类必须实现
+  abstract area(): number;       // 抽象方法：只有签名，没有实现，子类必须实现
 
-  describe(): string {           // 具体方法
+  describe(): string {           // 具体方法：有实现，子类可以直接继承使用
     return `Area: ${this.area()}`;
   }
 }
 
 class Circle extends Shape {
   constructor(public radius: number) {
-    super();
+    super();  // 必须调用父类构造函数
   }
 
-  area(): number {
+  area(): number {  // 必须实现抽象方法
     return Math.PI * this.radius ** 2;
   }
 }
+
+const c = new Circle(5);
+console.log(c.describe());  // "Area: 78.539..."——使用继承的具体方法
+// const s = new Shape();   // Error: 不能实例化抽象类
 ```
 
 ### 10.9 implements 与 interface
+
+`implements` 关键字让一个类实现一个或多个接口，确保类具有接口定义的所有方法和属性。接口定义了"契约"——任何实现该接口的类都必须提供接口中声明的方法：
 
 ```typescript
 interface Runnable {
@@ -1886,25 +2114,34 @@ interface Barkable {
   bark(): void;
 }
 
+// Dog 类同时实现两个接口——必须提供 run() 和 bark() 方法
 class Dog implements Runnable, Barkable {
   run(): void { console.log("Running..."); }
   bark(): void { console.log("Woof!"); }
 }
 ```
 
+> **`implements` vs `extends`**：`extends` 用于类继承类（或接口继承接口），`implements` 用于类实现接口。一个类只能 `extends` 一个类，但可以 `implements` 多个接口。
+
 ### 10.10 静态成员
+
+`static` 修饰符让属性或方法属于类本身，而不是类的实例。通过 `ClassName.xxx` 访问，不需要创建实例。有些工具函数或常量与类相关但不需要实例化，比如数学工具类的 `PI` 常量、数组的最大值方法等：
 
 ```typescript
 class Utils {
-  static readonly PI = 3.14159;
+  static readonly PI = 3.14159;  // 静态只读属性
 
-  static max<T>(arr: T[]): T {
+  static max<T>(arr: T[]): T {   // 静态泛型方法
     return arr.reduce((a, b) => a > b ? a : b);
   }
 }
 
-console.log(Utils.PI);
-console.log(Utils.max([1, 5, 3]));  // 5
+// 通过类名直接访问，不需要 new
+console.log(Utils.PI);                // 3.14159
+console.log(Utils.max([1, 5, 3]));   // 5
+
+// const u = new Utils();
+// u.PI;  // Error：PI 是静态成员，不能通过实例访问
 ```
 
 ---
@@ -1913,8 +2150,10 @@ console.log(Utils.max([1, 5, 3]));  // 5
 
 ### 11.1 导出与导入
 
+模块系统让你把代码拆分成多个文件，每个文件是一个模块。当项目变大时，所有代码写在一个文件里会变得不可维护。通过 `export` 导出需要对外暴露的内容，通过 `import` 导入其他模块的内容，实现封装和复用：
+
 ```typescript
-// ----- math.ts -----
+// ----- math.ts（定义模块）-----
 export const PI = 3.14159;
 
 export function add(a: number, b: number): number {
@@ -1929,52 +2168,70 @@ export class Calculator {
   }
 }
 
-// ----- app.ts -----
-// import { PI, add, Calculator } from "./math";
+// ----- app.ts（使用模块）-----
+import { PI, add, Calculator } from "./math";
+
+console.log(PI);           // 3.14159
+console.log(add(1, 2));    // 3
+const calc = new Calculator();
 ```
 
 ### 11.2 默认导出
 
+每个模块可以有一个默认导出（`export default`），导入时不需要花括号，名字可以自由取。当一个模块主要导出一个值（如配置对象、主组件）时，默认导出让导入语法更简洁：
+
 ```typescript
-// config.ts
+// config.ts——导出一个配置对象
 export default {
   apiUrl: "https://api.example.com",
   timeout: 5000,
 };
 
-// app.ts 中导入时：
-// import config from "./config";
+// app.ts——导入时名字可以随便取
+import config from "./config";
+console.log(config.apiUrl);
+
+// 也可以导入默认导出 + 命名导出
+// import config, { PI } from "./math";
 ```
 
 ### 11.3 重命名导入/导出
 
+用 `as` 关键字可以在导入或导出时重命名，避免命名冲突或让名字更清晰：
+
 ```typescript
-// 导入时重命名
-// import { add as sum } from "./math";
+// 导入时重命名——把 add 别名为 sum
+import { add as sum } from "./math";
+sum(1, 2);  // 用 sum 而不是 add
 
-// 导出时重命名
-// export { add as sum };
+// 导出时重命名——对外暴露时换个名字
+export { add as sum };
 
-// 统一导入所有
-// import * as MathUtils from "./math";
-// MathUtils.add(1, 2);
+// 统一导入所有导出——用 * as 起一个命名空间
+import * as MathUtils from "./math";
+MathUtils.add(1, 2);      // 通过命名空间访问
+MathUtils.PI;              // 3.14159
 ```
 
 ### 11.4 类型专用导入/导出
 
+`import type` 和 `export type` 只导入/导出类型信息，编译后会被完全擦除，不会生成任何 JS 代码。当你只需要类型（如接口、类型别名）而不需要运行时的值时，使用 `import type` 可以避免不必要的运行时依赖，也让意图更明确：
+
 ```typescript
-// types.ts
+// types.ts——定义类型
 export interface User {
   name: string;
   age: number;
 }
 export type ID = number | string;
 
-// app.ts —— 仅导入类型信息，编译后会被完全擦除：
-// import type { User, ID } from "./types";
+// app.ts——仅导入类型信息
+import type { User, ID } from "./types";
+// 编译后这行会被完全删除，不会生成 require/import 调用
 
-// 也可以合并导入值和类型：
-// import { add, type Calculator } from "./math";
+// 也可以合并导入值和类型
+import { add, type Calculator } from "./math";
+// add 是值，Calculator 是类型
 ```
 
 ### 11.5 CommonJS 与 ES Module 的互操作
@@ -2006,51 +2263,75 @@ import * as express from "express";
 
 ## 第十二章：高级类型概览（选读）
 
+> 本章介绍 TypeScript 的高级类型操作符，属于进阶内容。初学者可以先跳过，需要时再回来查阅。
+
 ### 12.1 索引访问类型
+
+用 `Type["key"]` 的语法可以从一个类型中提取某个属性的类型，就像用方括号访问对象属性一样。当你需要从一个复杂的类型中提取某个字段的类型时，不必手动写出来：
 
 ```typescript
 type Person = { name: string; age: number; address: { city: string } };
 
-type NameType = Person["name"];     // string
-type AgeType = Person["age"];       // number
-type CityType = Person["address"]["city"];  // string
+type NameType = Person["name"];           // string——提取 name 属性的类型
+type AgeType = Person["age"];             // number——提取 age 属性的类型
+type CityType = Person["address"]["city"];  // string——嵌套提取
 
-// 联合索引
+// 联合索引：同时提取多个属性的类型
 type NameOrAge = Person["name" | "age"];  // string | number
 ```
 
 ### 12.2 `keyof` 类型操作符
 
+`keyof` 接收一个对象类型，返回其所有属性名组成的联合类型。当你需要编写一个函数只接受对象已有的属性名作为参数时，`keyof` + 泛型约束可以实现编译时的属性名检查：
+
 ```typescript
 type Person = { name: string; age: number; email: string };
 type PersonKeys = keyof Person;  // "name" | "age" | "email"
 
+// K 必须是 T 的属性名之一
 function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
-  return obj[key];
+  return obj[key];  // 返回类型是 T[K]——对应属性的类型
 }
 
 const p: Person = { name: "Alice", age: 25, email: "a@b.com" };
-getProperty(p, "name");  // string
-// getProperty(p, "invalid");  // Error
+getProperty(p, "name");     // 返回类型是 string
+getProperty(p, "age");      // 返回类型是 number
+// getProperty(p, "invalid");  // Error："invalid" 不是 Person 的属性
 ```
 
 ### 12.3 `typeof` 类型操作符
 
+`typeof` 在类型位置使用时，获取一个值的类型。注意区分：运行时的 `typeof` 返回字符串（如 `"string"`），而类型位置的 `typeof` 返回类型。当你已经有一个具体的值（如配置对象），想从它推断出类型而不想手动写一遍时：
+
 ```typescript
 const person = { name: "Alice", age: 25 };
 type Person = typeof person;  // { name: string; age: number }
+
+// 常见用法：从 const 对象推断类型
+const defaultConfig = {
+  apiUrl: "https://api.example.com",
+  timeout: 5000,
+};
+type Config = typeof defaultConfig;
+// { apiUrl: string; timeout: number }
 ```
 
 ### 12.4 条件类型
 
+条件类型用 `T extends U ? X : Y` 的语法，根据类型参数是否满足约束来选择不同的类型，类似于运行时的三元运算符但在类型层面工作。当你需要根据输入类型的不同自动推断出不同的返回类型时：
+
 ```typescript
+// 如果 T 是 string 的子类型，返回 "yes"，否则返回 "no"
 type IsString<T> = T extends string ? "yes" : "no";
 
 type A = IsString<string>;  // "yes"
 type B = IsString<number>;  // "no"
+type C = IsString<"hello">;  // "yes"——字面量类型是 string 的子类型
 ```
 
 ### 12.5 映射类型
+
+映射类型遍历一个对象类型的所有属性，对每个属性应用某种变换，语法是 `[K in keyof T]: 新类型`。当你想基于一个现有类型创建一个变体（如全部变为只读、全部变为可选）时，不必手动重写每个属性：
 
 ```typescript
 // 将对象所有属性转为只读
@@ -2066,16 +2347,25 @@ type Partial<T> = {
 // 使用
 interface Person { name: string; age: number; }
 type ReadonlyPerson = Readonly<Person>;
+// { readonly name: string; readonly age: number; }
+
 type OptionalPerson = Partial<Person>;
+// { name?: string; age?: number; }
 
 export {};
 ```
 
+> TypeScript 内置了 `Readonly<T>` 和 `Partial<T>` 等工具类型（见附录 B），不需要自己定义。
+
 ### 12.6 模板字面量类型
 
+模板字面量类型用反引号语法在类型层面拼接字符串类型，支持 `Capitalize`、`Uppercase` 等内置工具类型。当你需要描述字符串的模式（如事件名必须以 `"on"` 开头）时，可以精确约束：
+
 ```typescript
+// 以 "on" 开头的任意字符串
 type EventName = `on${Capitalize<string>}`;
 
+// 从具体值推断
 type Events = "click" | "focus" | "blur";
 type EventHandlers = `on${Capitalize<Events>}`;
 // "onClick" | "onFocus" | "onBlur"
