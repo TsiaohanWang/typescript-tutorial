@@ -1,4 +1,4 @@
-# TypeScript 教程 —— 从编程基础到精通
+# TypeScript 系统教程：从编程基础到工程实践
 
 > 适用读者：有编程基础（Python/Java/C++等），但未学过 JavaScript 的学生
 > 参考来源：https://www.typescriptlang.org/docs/
@@ -88,12 +88,18 @@ const obj = { x: 0, y: 0, name: "Origin" };
 前提条件：安装 [Node.js](https://nodejs.org/)（包含 npm 包管理器）。
 
 ```bash
-# 全局安装 TypeScript 编译器
-npm install -g typescript
+# 创建项目目录并初始化
+mkdir my-ts-project && cd my-ts-project
+npm init -y
 
-# 验证安装
-tsc --version
+# 在当前项目中安装 TypeScript 编译器（-D 表示开发依赖）
+npm install -D typescript
+
+# 使用当前项目的 TypeScript 编译器
+npx tsc --version
 ```
+
+> **为什么不用全局安装？** 全局安装（`npm install -g typescript`）会导致不同项目可能使用不同版本的 TS 编译器，造成"在我电脑上能跑"的问题。项目本地安装确保团队成员和 CI 环境使用同一版本。
 
 ### 2.2 第一个程序
 
@@ -110,19 +116,37 @@ greet("Maddison", new Date());
 编译：
 
 ```bash
-tsc hello.ts
+npx tsc hello.ts
 ```
 
 运行后在同一目录下生成 `hello.js`。查看内容，你会发现类型注解被擦除了：
 
 ```javascript
 function greet(person, date) {
-  console.log(`Hello ${person}, today is ${date.toDateString()}!`);
+  console.log("Hello " + person + ", today is " + date.toDateString() + "!");
 }
 greet("Maddison", new Date());
 ```
 
-> 注意：模板字符串被保留了（因为目标是 ES2015+）。如果目标是 ES5，模板字符串会被转换为 `.concat()` 调用。
+> **注意**：直接运行 `tsc hello.ts`（没有 tsconfig.json）时，默认编译目标是 ES3/ES5，模板字符串会被转换为字符串拼接。如果想保留模板字符串，需要指定目标版本：
+>
+> ```bash
+> npx tsc --target ES2015 hello.ts
+> ```
+>
+> 后续章节会介绍 `tsconfig.json`，届时只需运行 `npx tsc` 即可按项目配置编译。
+
+TypeScript 的编译流程：
+
+```text
+.ts 源码
+  ↓ tsc 编译（类型检查 + 语法转换）
+.js 输出（类型信息被擦除）
+  ↓ Node.js / 浏览器运行
+运行结果
+```
+
+> TS 负责检查类型和生成 JS；Node.js 或浏览器负责真正运行 JS。这就是为什么 TS 的类型在运行时"消失"了。
 
 用 Node 运行：
 
@@ -185,14 +209,15 @@ VSCode 内置 TypeScript 支持，安装后即可获得：
 
 在开始之前，先了解几个 JS 特有的概念，它们在其他语言中不太常见：
 
-**Hoisting（变量提升）**：JS 引擎在执行代码前，会先把 `var` 和 `function` 声明"提升"到作用域顶部。这意味着你可以在声明之前使用它们（值为 `undefined`）。`let` 和 `const` 不会被提升，所以它们有"暂时性死区"（TDZ）——在声明前访问会报错。
+**Hoisting（变量提升）**：JS 引擎在执行代码前，会先把 `var` 和 `function` 声明"提升"到作用域顶部。这意味着你可以在声明之前使用它们（值为 `undefined`）。`let` 和 `const` 也会进入作用域，但在声明语句执行前处于**暂时性死区**（TDZ），不能像 `var` 那样在声明前读到 `undefined`。
 
-```typescript
-console.log(a);  // undefined（var 被提升了）
+```javascript
+// 以下是 JavaScript 行为示例（不是 TS 推荐写法）
+console.log(a);  // undefined（var 被提升了，但值是 undefined）
 var a = 1;
 
-// console.log(b);  // ReferenceError（let/const 有 TDZ）
-// let b = 2;
+console.log(b);  // ReferenceError: Cannot access 'b' before initialization
+let b = 2;       // let/const 有 TDZ，声明前访问会报错
 ```
 
 **闭包（Closure）**：函数可以"记住"它被创建时的词法环境。即使外部函数已经返回，内部函数仍然可以访问外部函数的变量。
@@ -225,6 +250,16 @@ const y = 20;  // 不可变变量（对应 final/const）
 - `let` 是块级作用域（block-scoped），类似于其他语言的局部变量
 - `const` 也是块级作用域，且声明后不能重新赋值
 - **不要使用 `var`**（它是函数级作用域，有 hoisting 问题，现代 JS 不推荐使用）
+
+> ⚠️ **`const` 不等于"深度不可变"**：`const` 只保证变量不能重新赋值，但对象/数组的内容仍然可以修改：
+>
+> ```typescript
+> const user = { name: "Alice" };
+> user.name = "Bob";  // OK——修改对象属性
+> // user = { name: "Tom" };  // Error——不能重新赋值
+> ```
+>
+> 如果需要深度不可变，可以用 `as const`（见第四章）或 Object.freeze()。
 
 对比其他语言：
 
@@ -401,7 +436,7 @@ const sym: symbol = Symbol("key"); // 唯一标识符
 
 ---
 
-### 4.2.1 `object` 类型
+### 4.3 `object` 类型
 
 `object` 表示任何**非原始值**（不是 `string`/`number`/`boolean`/`bigint`/`symbol`/`null`/`undefined` 的值）：
 
@@ -413,7 +448,7 @@ const arr: object = [1, 2, 3];
 
 > ❗ 注意是 `object`（小写），不是 `Object`（大写）。`Object` 是 JS 内置构造函数类型，包含所有能调用 `toString()` 等的值，约束更宽松，实际编码中几乎不该使用。
 
-### 4.3 数组
+### 4.4 数组
 
 ```typescript
 // 两种等价写法
@@ -424,7 +459,7 @@ const arr2: Array<number> = [1, 2, 3];
 const matrix: number[][] = [[1, 2], [3, 4]];
 ```
 
-### 4.4 联合类型（Union Types）
+### 4.5 联合类型（Union Types）
 
 联合类型用 `|` 表示一个值可以是几种类型之一。实际编程中，一个值往往不只有一种可能——用户 ID 可能是数字（数据库自增）也可能是字符串（UUID），函数参数可能接受数组或单个值。联合类型让你精确描述这种"多选一"的场景：
 
@@ -455,7 +490,7 @@ function printId(id: number | string) {
 
 > **与其他语言对比**：Python 用 `Union[int, str]`（需从 `typing` 模块导入），Java/C++ 不直接支持、通常用接口+多态实现类似效果，而 TS 的 `number | string` 语法简洁且原生支持。
 
-### 4.5 类型别名（Type Aliases）
+### 4.6 类型别名（Type Aliases）
 
 当同一个类型在多处使用时，直接写完整类型既冗长又容易出错。`type` 关键字允许你给任意类型起一个名字，之后用这个名字来引用——一处定义、多处引用，修改时也只需改一个地方：
 
@@ -484,7 +519,7 @@ myId = "abc";          // 也 OK——ID 就是 number | string
 
 > **与 `interface` 的区别**：`type` 可以为任何类型起名（联合类型、原始类型、函数类型等），而 `interface` 只能描述对象类型。详见第六章。
 
-### 4.6 `any` —— 逃生舱
+### 4.7 `any` —— 逃生舱
 
 `any` 是 TypeScript 中最宽松的类型——它可以赋值为任何类型，也可以调用任何方法、访问任何属性，编译器不会报错。当你从纯 JS 迁移到 TS，或者使用没有类型定义的第三方库时，`any` 让你不必一次性给所有代码加类型，是一条渐进式引入类型的"逃生通道"。但另一方面，`any` 等于关闭了该值的所有类型检查，拼写错误、参数遗漏、类型不匹配等问题都不会被发现，和写纯 JS 没有区别：
 
@@ -508,7 +543,7 @@ value.foo.bar.baz;   // 也不会报错——完全放弃了检查
 
 > **建议**：新项目始终开启 `noImplicitAny`。如果实在不知道某个值的类型，优先用 `unknown` 而不是 `any`。
 
-### 4.7 `unknown` —— 安全的 any
+### 4.8 `unknown` —— 安全的 any
 
 `unknown` 和 `any` 一样可以接收任何类型的值，但关键区别在于——你**不能直接使用** `unknown` 类型的值，必须先用类型守卫（如 `typeof` 检查）收窄类型后才能操作它。这让 `unknown` 成为 `any` 的安全替代品：允许接收任意值，但强制你在使用前先确认类型：
 
@@ -532,7 +567,7 @@ if (typeof value === "string") {
 | 可以直接调用方法 | ✓（不检查） | ✗（必须先收窄） |
 | 类型安全性 | 无 | 有 |
 
-### 4.8 `void`、`never` 和 `undefined`
+### 4.9 `void`、`never` 和 `undefined`
 
 这三个类型都与"没有值"有关，但使用场景截然不同。
 
@@ -585,7 +620,7 @@ function printName(name?: string): void {
 }
 ```
 
-### 4.9 字面量类型（Literal Types）
+### 4.10 字面量类型（Literal Types）
 
 `string`、`number` 这类宽泛类型表示"任意字符串"或"任意数字"。但有时你需要更精确的约束——比如一个参数只能是 `"left"`、`"right"` 或 `"center"` 三个值之一。字面量类型让你用具体的值本身作为类型，组合起来就能限定一个值的可选范围：
 
@@ -633,7 +668,7 @@ const req2 = { url: "https://example.com", method: "GET" } as const;
 handleRequest(req2.url, req2.method);  // OK
 ```
 
-### 4.10 `as const` —— 断言字面量类型
+### 4.11 `as const` —— 断言字面量类型
 
 上一节的字面量推断问题揭示了一个普遍需求：你经常需要让一个对象的所有属性都被推断为字面量类型，而不是被拓宽为宽泛类型。`as const` 就是为此而生的。
 
@@ -700,7 +735,7 @@ const pair = ["hello", 42] as const;
 
 > **`as const` vs `readonly`**：`readonly` 只标记属性为只读，不阻止类型拓宽（`readonly x: number`）。`as const` 既标记为只读，又锁定为字面量类型（`readonly x: 10`）。`as const` 是 `readonly` 的"完全体"。
 
-### 4.11 `enum` —— 枚举类型
+### 4.12 `enum` —— 枚举类型
 
 当一个变量只能取几个固定的值时，用字符串字面量（如 `"up"` / `"down"`）容易拼错，也缺乏自动补全。枚举（`enum`）为这组固定的值提供有意义的名字。与大多数 TS 特性不同，`enum` 不是纯类型层面的——编译后会生成真实的 JS 对象，因此有运行时开销：
 
@@ -736,18 +771,18 @@ move(Direction.Up);  // 输出 "Up"
 
 > ⚠️ **反向映射**（`Direction[direction]`）仅对数字枚举有效。字符串枚举**不会**生成反向映射。反向映射是数字枚举特有的运行时行为——编译后生成的对象同时支持 `Direction.Up → 0` 和 `Direction[0] → "Up"` 两种查找。
 
-**`enum` vs `as const`**：`enum` 会生成真实的 JS 对象，有运行时开销。如果你只需要一组命名常量而不需要反向映射，可以用 `as const` + 联合类型替代，效果相同但不产生运行时代码：
+**`enum` vs `as const`**：`enum` 会生成真实的 JS 对象，有运行时开销。如果你只需要一组命名常量而不需要反向映射，可以用 `as const` + 联合类型替代，输出更接近原生 JS：
 
 ```typescript
-// 方式 1：enum（有运行时开销）
-enum Direction {
+// 方式 1：enum（编译后生成额外的 JS 对象和反向映射）
+enum EnumDirection {
   Up, Down, Left, Right,
 }
 
-// 方式 2：as const（无运行时开销，编译后完全擦除）
-const Direction = { Up: 0, Down: 1, Left: 2, Right: 3 } as const;
-type Direction = (typeof Direction)[keyof typeof Direction];
-// Direction 的类型是 0 | 1 | 2 | 3
+// 方式 2：as const（编译后只保留一个普通对象，类型部分被擦除）
+const DirectionMap = { Up: 0, Down: 1, Left: 2, Right: 3 } as const;
+type DirectionValue = (typeof DirectionMap)[keyof typeof DirectionMap];
+// DirectionValue 的类型是 0 | 1 | 2 | 3
 ```
 
 > 枚举是 TypeScript 特有的功能——它不是纯类型层面的，编译后会生成真实的 JS 对象。官方文档建议"了解它存在，但除非确定需要，否则谨慎使用"。如果你只需要一组命名常量而不需要反向映射，可以用 `as const` 替代。更多细节见：https://www.typescriptlang.org/docs/handbook/enums.html
@@ -1169,7 +1204,7 @@ p.x = 5;              // Error: Cannot assign to 'x' because it is a read-only p
 
 ### 6.4 Type 别名
 
-`type` 关键字为类型起一个名字，之后可以用这个名字来引用。当同一个类型在多处使用时，避免重复写完整的类型定义，详见第四章 4.5 节：
+`type` 关键字为类型起一个名字，之后可以用这个名字来引用。当同一个类型在多处使用时，避免重复写完整的类型定义，详见第四章 4.6 节：
 
 ```typescript
 // 命名对象类型
@@ -1789,6 +1824,22 @@ const palette = {
 palette.green.toUpperCase();
 ```
 
+**为什么不用类型注解或 `as`？**
+
+```typescript
+// ❌ 类型注解：green 被拓宽为 string | RGB，丢失了精确类型
+const palette1: Record<Colors, string | RGB> = { ... };
+palette1.green.toUpperCase();  // Error: string | RGB 没有 toUpperCase
+
+// ❌ as 断言：green 也被拓宽为 string | RGB
+const palette2 = { ... } as Record<Colors, string | RGB>;
+palette2.green.toUpperCase();  // Error: 同上
+
+// ✅ satisfies：green 保留为 string（精确推断），同时检查整体结构
+const palette3 = { ... } satisfies Record<Colors, string | RGB>;
+palette3.green.toUpperCase();  // OK
+```
+
 `satisfies` 同时满足：
 1. 检查值的类型是否符合约束
 2. 保留最精确的推导类型
@@ -1973,7 +2024,7 @@ class Animal {
 
 ```typescript
 // 传统写法：需要声明属性 + 构造函数参数 + 手动赋值
-class Animal {
+class AnimalVerbose {
   public name: string;
   private age: number;
   protected species: string;
@@ -1986,7 +2037,7 @@ class Animal {
 }
 
 // 参数属性简写：一行搞定
-class Animal {
+class AnimalShort {
   constructor(
     public name: string,      // 自动创建 public name 属性并赋值
     private age: number,      // 自动创建 private age 属性并赋值
@@ -2319,13 +2370,25 @@ import * as express from "express";
 
 > **建议**：新项目始终在 tsconfig 中开启 `esModuleInterop: true`，避免不必要的导入语法差异。
 
+> ⚠️ **Node ESM 下的扩展名问题**：在 Vite/Webpack 等打包器环境中，导入本地模块时可以省略扩展名（`import { foo } from "./bar"`）。但在 Node.js ESM 模式（`moduleResolution: nodenext`）下，很多场景需要写完整扩展名：
+>
+> ```typescript
+> // 打包器环境——OK
+> import { add } from "./math";
+>
+> // Node.js ESM——需要 .js 扩展名
+> import { add } from "./math.js";
+> ```
+>
+> 这是 Node.js ESM 的规范要求，不是 TypeScript 的问题。
+
 ---
 
 ## 第十二章：声明文件与类型空间
 
 ### 12.1 什么是声明文件（.d.ts）
 
-JavaScript 库本身没有类型信息。TypeScript 通过**声明文件**（Declaration File，扩展名 `.d.ts`）为 JS 库添加类型描述。这样你在 TS 中导入 JS 库时，就能获得类型检查和自动补全。
+纯 JavaScript 库本身没有类型信息，但很多现代库会在包内自带 `.d.ts` 类型定义，不需要额外安装。对于没有内置类型的库，TypeScript 通过**声明文件**（Declaration File，扩展名 `.d.ts`）来添加类型描述。这样你在 TS 中导入 JS 库时，就能获得类型检查和自动补全。
 
 ```typescript
 // 假设你安装了一个纯 JS 库 "lodash"
@@ -2523,7 +2586,7 @@ function processUser(data: User) {
 
 // 来自外部的"不可信"数据
 const rawData = JSON.parse('{"name": "Alice", "age": "twenty"}');
-processUser(rawData);  // 运行时错误：age 是 string "twenty"，无法做数值加法，结果是 "twenty1" 而不是 21
+processUser(rawData);  // 不会抛异常，但得到错误结果："twenty" + 1 变成 "twenty1" 而不是 21
 ```
 
 Zod 解决了这个问题：它让你用 TS 风格的代码定义 schema（模式），在运行时验证数据，同时自动推断出 TypeScript 类型。一份定义，同时获得**验证**和**类型**。
@@ -2533,6 +2596,8 @@ Zod 解决了这个问题：它让你用 TS 风格的代码定义 schema（模�
 ```bash
 npm install zod
 ```
+
+> 以下示例默认已执行 `import { z } from "zod"`。
 
 定义 schema、验证数据、推断类型——三步完成：
 
@@ -2710,6 +2775,18 @@ ColorSchema.parse("red");     // OK
 type Color = z.infer<typeof ColorSchema>;
 ```
 
+> ⚠️ 如果枚举值来自变量，必须用 `as const` 保留字面量类型，否则推断会变宽为 `string`：
+>
+> ```typescript
+> // ❌ 推断为 string[]，Color 变成 string
+> const colors = ["red", "green", "blue"];
+> const BadSchema = z.enum(colors);
+>
+> // ✅ 推断为 readonly ["red", "green", "blue"]，Color 是 "red" | "green" | "blue"
+> const colors = ["red", "green", "blue"] as const;
+> const GoodSchema = z.enum(colors);
+> ```
+
 ### 14.9 联合类型与可辨识联合
 
 `z.union` 对应 TS 的联合类型（`A | B`），验证时依次检查每个候选 schema，第一个通过的就返回：
@@ -2795,31 +2872,85 @@ async function fetchPosts(): Promise<Post[]> {
 
 ---
 
+## 练习建议
+
+TypeScript 学习的难点不是语法本身，而是读懂类型错误并理解类型系统的行为。以下是按章节组织的练习建议：
+
+### 基础类型（第四章）
+1. 写一个函数，接收 `string | number`，安全地将其转为字符串返回
+2. 定义一个 `User` 类型，其中 `email` 可选，写一个函数安全地打印用户信息
+3. 用字面量类型定义一个 `Direction` 类型，限定为 `"up" | "down" | "left" | "right"`
+
+### 函数（第五章）
+1. 写一个泛型函数 `firstElement<T>`，返回数组的第一个元素（可能为 `undefined`）
+2. 用函数重载实现：传入 `string` 返回 `string`，传入 `number[]` 返回 `number`
+3. 写一个接受回调的函数，体会上下文类型推断
+
+### 类型收窄（第七章）
+1. 用 `typeof` 和 `in` 收窄联合类型
+2. 定义一个可辨识联合 `Shape`，用 `switch` 实现 `area` 函数
+3. 用穷尽性检查确保处理了所有分支
+
+### 常见报错及解决
+| 报错信息 | 含义 | 解决方法 |
+|---------|------|---------|
+| `Type 'undefined' is not assignable to type 'X'` | 值可能是 `undefined` | 添加 `if (x !== undefined)` 检查 |
+| `Object is possibly 'undefined'` | 对象属性可能不存在 | 用可选链 `?.` 或先检查 |
+| `Property 'X' does not exist on type 'Y'` | 访问不存在的属性 | 检查拼写，或用类型守卫收窄 |
+| `Argument of type 'X' is not assignable to parameter of type 'Y'` | 参数类型不匹配 | 检查函数签名，或用类型断言 |
+| `No overload matches this call` | 函数重载都不匹配 | 检查参数类型和数量 |
+
+---
+
 ## 附录 A：tsconfig.json 常用配置
+
+### 前端应用项目（Vite/React/Vue）
 
 ```json
 {
   "compilerOptions": {
-    "target": "ES2020",         // 编译目标版本
-    "module": "ESNext",         // 模块系统
-    "moduleResolution": "bundler",  // 模块解析策略
-    "lib": ["ES2020", "DOM"],   // 环境类型库
-    "outDir": "./dist",         // 输出目录
-    "rootDir": "./src",         // 源码目录
-    "strict": true,             // 启用所有严格检查
-    "noUncheckedIndexedAccess": true, // 索引访问返回 T | undefined（更安全但使用不便）
-    "esModuleInterop": true,    // 兼容 CommonJS 和 ES Module
-    "skipLibCheck": true,       // 跳过声明文件检查（加速编译）
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmit": true,              // 由 Vite/esbuild 负责编译，TS 只做类型检查
+    "jsx": "react-jsx",          // React JSX 支持（Vue 项目可省略）
+    "esModuleInterop": true,
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,  // 允许导入 JSON 文件
-    "declaration": true,        // 生成 .d.ts 声明文件
-    "declarationMap": true,     // 为声明文件生成 sourcemap
-    "sourceMap": true           // 生成 .js.map（调试用）
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*"],
+  "include": ["src"]
+}
+```
+
+### Node.js / 库项目
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2020"],
+    "strict": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,         // 生成 .d.ts 声明文件（库项目必备）
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "types": ["node"]            // 显式指定 @types/node（TS 6.0 默认不自动包含）
+  },
+  "include": ["src"],
   "exclude": ["node_modules", "dist"]
 }
 ```
+
+> **选择建议**：用 Vite/Webpack/Parcel 等打包器 → 选 `bundler`；直接用 Node.js 运行 → 选 `nodenext`。详见附录 TS 6.0 变更说明。
 
 > ⚠️ `noUncheckedIndexedAccess` 会让所有索引访问（如 `arr[i]`、`obj[key]`）的返回值类型自动包含 `undefined`。这很安全，但会使代码中频繁出现非空断言（`!`）或条件判断。初学者可以先关闭此选项，熟悉 TS 后再启用。
 
@@ -2842,13 +2973,14 @@ async function fetchPosts(): Promise<Post[]> {
 
 如果你使用 TypeScript 6.0+，以下编译选项默认值发生了变化：
 
-| 选项 | 5.x 默认值 | 6.0 默认值 | 影响 |
-|------|-----------|-----------|------|
-| `strict` | `false` | `true` | 新项目无需手动开启 |
-| `target` | `es3` | `es2025` | 输出更现代的 JS 语法 |
-| `esModuleInterop` | `false` | `true`（始终启用） | 无需手动设置 |
-| `moduleResolution` | `classic`/`node` | `nodenext` | `node` 已弃用，应使用 `nodenext` 或 `bundler` |
-| `types` | 自动包含所有 `@types` | `[]`（空） | 需手动指定 `@types` 包 |
+| 选项 | 5.x 常见默认/行为 | 6.0 变化 | 建议 |
+|------|-----------------|---------|------|
+| `strict` | 默认 `false` | 默认 `true` | 新项目保留 `true` |
+| `target` | 默认 `es3`（偏低） | 当前为 `es2025` | 生产项目仍建议显式写出 |
+| `module` | 常需手动设置 | 默认 `esnext` | Node 项目单独考虑 `nodenext` |
+| `esModuleInterop` | 默认 `false` | 始终启用，无法设为 `false` | 无需手动设置 |
+| `moduleResolution` | `node/node10` 常见 | `node/node10` 已弃用 | Node 用 `nodenext`，Vite/Webpack 用 `bundler` |
+| `types` | 自动包含所有 `@types` | 默认 `[]`（空） | `@types/node`、`@types/jest` 等需显式配置 |
 
 > 这些变更主要是为了让新项目的默认行为更现代化。核心语法（类型注解、泛型、联合类型等）不受影响。
 
@@ -2941,9 +3073,17 @@ npx ts-node src/index.ts
 {
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "files": ["dist"]
 }
 ```
+
+> `exports` 是 Node.js 现代模块解析的标准字段，支持 ESM 和 CJS 双轨发布。`main` 保留用于向后兼容旧版工具。
 
 ---
 
