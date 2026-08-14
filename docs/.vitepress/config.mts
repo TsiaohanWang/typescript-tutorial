@@ -9,6 +9,11 @@ export default defineConfig({
   base: '/typescript-tutorial/',
   lastUpdated: true,
 
+  // 关闭裸 URL 自动转链接（linkify），URL 以纯文本显示
+  markdown: {
+    linkify: false,
+  },
+
   head: [
     ['link', { rel: 'icon', href: '/typescript-tutorial/favicon.svg' }],
   ],
