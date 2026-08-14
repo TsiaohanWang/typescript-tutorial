@@ -17,8 +17,54 @@ export default defineConfig({
     logo: '/ts-logo.svg',
     nav: [
       { text: '首页', link: '/' },
-      { text: '第一章', link: '/ch01' },
-      { text: '练习建议', link: '/exercises' },
+      {
+        text: '目录',
+        items: [
+          {
+            text: '入门',
+            items: [
+              { text: '第一章 开篇', link: '/ch01' },
+              { text: '第二章 环境搭建', link: '/ch02' },
+              { text: '第三章 JS 快速补课', link: '/ch03' },
+              { text: '第四章 基础类型系统', link: '/ch04' },
+            ],
+          },
+          {
+            text: '核心',
+            items: [
+              { text: '第五章 函数类型', link: '/ch05' },
+              { text: '第六章 对象类型与接口', link: '/ch06' },
+              { text: '第七章 类型收窄', link: '/ch07' },
+              { text: '第八章 推导与断言', link: '/ch08' },
+            ],
+          },
+          {
+            text: '进阶',
+            items: [
+              { text: '第九章 泛型', link: '/ch09' },
+              { text: '第十章 类', link: '/ch10' },
+              { text: '第十一章 模块系统', link: '/ch11' },
+              { text: '第十二章 声明文件', link: '/ch12' },
+            ],
+          },
+          {
+            text: '提高',
+            items: [
+              { text: '第十三章 高级类型（选读）', link: '/ch13' },
+              { text: '第十四章 Zod 运行时验证', link: '/ch14' },
+            ],
+          },
+          {
+            text: '实践',
+            items: [
+              { text: '练习建议', link: '/exercises' },
+              { text: '附录 A tsconfig 配置', link: '/appendix-a' },
+              { text: '附录 B 工具类型', link: '/appendix-b' },
+              { text: '附录 C 真实项目实践', link: '/appendix-c' },
+            ],
+          },
+        ],
+      },
       {
         text: '参考',
         items: [
