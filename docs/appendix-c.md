@@ -48,5 +48,5 @@ npx ts-node src/index.ts
 
 ---
 
-> 📖 本教程基于 TypeScript 官方文档（https://www.typescriptlang.org/docs/）整理编写。
-> 建议配合 TypeScript Playground（https://www.typescriptlang.org/play/）练习。
+> 📖 本教程基于 [TypeScript 官方文档](https://www.typescriptlang.org/docs/) 整理编写。
+> 建议配合 [TypeScript Playground](https://www.typescriptlang.org/play/) 练习。

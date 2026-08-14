@@ -1,7 +1,7 @@
 # TypeScript 系统教程：从编程基础到工程实践
 
 > 适用读者：有编程基础（Python/Java/C++等），但未学过 JavaScript 的学生
-> 参考来源：https://www.typescriptlang.org/docs/
+> 参考来源：[TypeScript 官方文档](https://www.typescriptlang.org/docs/)
 > 本教程基于 TypeScript 6.x / 7.x 编写，文中全部代码已用 TypeScript 7.0（2026 年 7 月发布的最新稳定版，原生 Go 移植，编译速度提升 8–12 倍）验证通过。TypeScript 6.0（2026 年发布）调整了部分编译选项的默认值（如 `strict` 默认为 `true`、`target` 默认为 `es2025`、`types` 默认为 `[]`），7.0 移除了 6.0 中弃用的选项，但核心语法和类型系统保持不变。详见附录 A。
 
 ---
