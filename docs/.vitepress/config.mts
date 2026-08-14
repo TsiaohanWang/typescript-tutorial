@@ -147,7 +147,7 @@ export default defineConfig({
     returnToTopLabel: '返回顶部',
     lastUpdated: { text: '最后更新', formatOptions: { dateStyle: 'short', timeStyle: 'short' } },
     editLink: {
-      pattern: 'https://github.com/TsiaohanWang/typescript-tutorial/edit/master/TypeScript教程.md',
+      pattern: 'https://github.com/TsiaohanWang/typescript-tutorial/edit/master/docs/:path',
       text: '在 GitHub 上编辑本页',
     },
     externalLinkIcon: true,
