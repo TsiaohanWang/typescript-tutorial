@@ -2,11 +2,32 @@
 
 > 适用读者：有编程基础（Python/Java/C++等），但未学过 JavaScript 的学生
 > 参考来源：https://www.typescriptlang.org/docs/
-> 本教程基于 TypeScript 5.x 编写。TypeScript 6.0 于 2026 年发布，部分编译选项默认值发生了变化（如 `strict` 默认为 `true`、`target` 默认为 `es2025`），但核心语法和类型系统保持不变。详见附录 A。
+> 本教程基于 TypeScript 6.x / 7.x 编写，文中全部代码已用 TypeScript 7.0（2026 年 7 月发布的最新稳定版，原生 Go 移植，编译速度提升 8–12 倍）验证通过。TypeScript 6.0（2026 年发布）调整了部分编译选项的默认值（如 `strict` 默认为 `true`、`target` 默认为 `es2025`、`types` 默认为 `[]`），7.0 移除了 6.0 中弃用的选项，但核心语法和类型系统保持不变。详见附录 A。
+
+---
+
+## 如何使用本教程
+
+本教程共 14 章 + 3 个附录，建议按下面的路径学习：
+
+| 阶段 | 章节 | 内容 |
+|------|------|------|
+| **入门**（必读） | 第一 ~ 第四章 | TS 是什么、环境搭建、JS 快速补课、基础类型系统 |
+| **核心**（必读） | 第五 ~ 第八章 | 函数类型、对象类型与接口、类型收窄、推导与断言 |
+| **进阶**（必读） | 第九 ~ 第十二章 | 泛型、类、模块系统、声明文件 |
+| **提高**（选读） | 第十三、十四章 | 高级类型操作符、Zod 运行时验证 |
+| **实战参考**（按需查阅） | 附录 A/B/C | tsconfig 配置模板、工具类型速查、真实项目集成 |
+
+- 每章开头的**本章目标**列出了学完后应掌握的能力，可用于自测；每章末尾的**本章小结**用于快速回顾
+- 有 Java/C# 背景的同学重点看第三章（JS 补课）和 6.6 节（`type` vs `interface`）；有 Python 背景的同学重点看第一、四章中的类型对比
+- 文中 `✅` 表示推荐写法、`❌` 表示不推荐的写法、`⚠️` 表示常见陷阱
+- 所有代码示例都可以直接复制到 [TypeScript Playground](https://www.typescriptlang.org/play/) 或本地项目里运行，验证方式见第二章
 
 ---
 
 ## 第一章：开篇 —— 什么是 TypeScript
+
+> **本章目标**：理解 JavaScript 动态类型带来的问题；明白 TypeScript 的解决思路与核心设计原则（超集、结构类型、类型擦除）；对比 Java/C#/Python 的差异。
 
 ### 1.1 JavaScript 的困局
 
@@ -79,9 +100,16 @@ const obj = { x: 0, y: 0, name: "Origin" };
 2. **类型是可选的** —— 你可以渐进式地给 JS 代码加类型
 3. **不阻挡你** —— 即使有类型错误，TS 默认仍然生成 JS 文件
 
+> **本章小结**：
+> 1. TS 是 JS 的超集：合法的 JS 基本都是合法的 TS，类型只是附加的一层
+> 2. 类型检查发生在**编译时**，运行时类型信息被擦除
+> 3. TS 采用**结构类型**——形状兼容即类型兼容，无需显式继承或实现
+
 ---
 
 ## 第二章：环境搭建 + 你的第一个 TS 程序
+
+> **本章目标**：完成 TypeScript 安装；理解 `tsc` 编译流程与类型擦除；掌握常用编译选项与 `tsconfig.json` 项目配置。
 
 ### 2.1 安装
 
@@ -119,19 +147,20 @@ greet("Maddison", new Date());
 npx tsc hello.ts
 ```
 
-运行后在同一目录下生成 `hello.js`。查看内容，你会发现类型注解被擦除了：
+运行后在同一目录下生成 `hello.js`。查看内容，你会发现类型注解被擦除了（在 TypeScript 6.0+ 的默认配置下，模板字符串会原样保留，并自动加上 `"use strict"`）：
 
 ```javascript
+"use strict";
 function greet(person, date) {
-  console.log("Hello " + person + ", today is " + date.toDateString() + "!");
+    console.log(`Hello ${person}, today is ${date.toDateString()}!`);
 }
 greet("Maddison", new Date());
 ```
 
-> **注意**：直接运行 `tsc hello.ts`（没有 tsconfig.json）时，默认编译目标是 ES3/ES5，模板字符串会被转换为字符串拼接。如果想保留模板字符串，需要指定目标版本：
+> **注意**：在 TypeScript 6.0 之前，直接运行 `tsc hello.ts`（没有 tsconfig.json）时，默认编译目标是 ES5，模板字符串会被转换为字符串拼接。从 6.0 开始默认目标提升为 `ES2025`（且默认开启严格模式），现代语法会原样保留。如果想显式指定目标版本：
 >
 > ```bash
-> npx tsc --target ES2015 hello.ts
+> npx tsc --target ES2022 hello.ts
 > ```
 >
 > 后续章节会介绍 `tsconfig.json`，届时只需运行 `npx tsc` 即可按项目配置编译。
@@ -158,15 +187,17 @@ node hello.js
 ### 2.3 编译选项
 
 ```bash
-# 严格模式（生产环境推荐）
-tsc --strict hello.ts
+# 严格模式（生产环境推荐；TS 6.0+ 已默认开启，显式写出以明确意图）
+npx tsc --strict hello.ts
 
-# 指定目标 JS 版本
-tsc --target es2015 hello.ts
+# 指定目标 JS 版本（TS 6.0+ 默认已是 es2025，通常无需指定）
+npx tsc --target es2022 hello.ts
 
 # 有错时不生成 JS 文件
-tsc --noEmitOnError hello.ts
+npx tsc --noEmitOnError hello.ts
 ```
+
+> 小知识：TS 6.0 起在无 `tsconfig.json` 时也默认开启 `strict`、默认 `target` 为 `es2025`；如果目录里存在 `tsconfig.json` 却又在命令行指定文件（如 `tsc hello.ts`），会报错 `TS5112` 并需要加 `--ignoreConfig` 才能忽略配置——这正是"用 tsconfig.json 管理项目"的设计意图。
 
 ### 2.4 tsconfig.json —— 项目级配置
 
@@ -181,13 +212,15 @@ tsc --init
 ```json
 {
   "compilerOptions": {
-    "target": "ES2015",
+    "target": "ES2022",
     "strict": true,
     "outDir": "./dist",
     "rootDir": "./src"
   }
 }
 ```
+
+> TS 6.0 起默认 `target` 已是 `es2025`，`strict` 默认开启；这里显式写出是为了明确意图并按项目运行环境设定（需要兼容旧运行时就把 `target` 调低，如 `ES2018`）。
 
 ### 2.5 VSCode 编辑器支持
 
@@ -199,10 +232,16 @@ VSCode 内置 TypeScript 支持，安装后即可获得：
 
 > **新手提示**：入门阶段可以先用 TypeScript Playground（https://www.typescriptlang.org/play/）在线练习，无需安装。
 
+> **本章小结**：
+> 1. 在项目本地安装 TS，用 `npx tsc` 编译；`tsc` 只负责类型检查 + 语法转译，真正运行交给 Node.js / 浏览器
+> 2. `tsconfig.json` 是项目级配置；TS 6.0+ 默认 `strict: true`、`target: es2025`、`types: []`
+> 3. 类型错误默认**不会**阻止生成 JS 文件；需要"有错就不输出"时加 `--noEmitOnError`
+
 ---
 
 ## 第三章：快速 JS 补课
 
+> **本章目标**：快速掌握 JavaScript 中与 TS 学习直接相关的概念——`let`/`const`、基本类型、模板字符串、箭头函数、`===`、对象字面量、数组、解构赋值。
 > 对已有编程基础的同学，这里只讲 JS 独特的地方，不讲什么是变量/循环/函数。
 
 ### 前置知识：JS 特有的概念
@@ -395,9 +434,16 @@ const evens = nums.filter((n) => n % 2 === 0); // 过滤
 }
 ```
 
+> **本章小结**：
+> 1. 优先 `const`，需要重新赋值时才用 `let`，永远不要用 `var`
+> 2. 类型名一律小写：`string`/`number`/`boolean`，不是 `String`/`Number`/`Boolean`
+> 3. 用模板字符串（反引号 `` ` ``）做插值；用箭头函数写短回调；相等比较一律用 `===`
+
 ---
 
 ## 第四章：基础类型系统
+
+> **本章目标**：掌握类型注解语法；熟悉原始类型、`object`、数组、联合类型；会用 `type` 别名；理解 `any`/`unknown`/`void`/`never` 的适用场景；掌握字面量类型、`as const` 与 `enum`。
 
 ### 4.1 类型注解语法
 
@@ -787,9 +833,17 @@ type DirectionValue = (typeof DirectionMap)[keyof typeof DirectionMap];
 
 > 枚举是 TypeScript 特有的功能——它不是纯类型层面的，编译后会生成真实的 JS 对象。官方文档建议"了解它存在，但除非确定需要，否则谨慎使用"。如果你只需要一组命名常量而不需要反向映射，可以用 `as const` 替代。更多细节见：https://www.typescriptlang.org/docs/handbook/enums.html
 
+> **本章小结**：
+> 1. 联合类型（`|`）与类型别名（`type`）是描述"多选一"的基础工具
+> 2. 尽量不用 `any`；需要接受任意值但安全使用时用 `unknown`
+> 3. `void` 表示"返回值不被使用"，`never` 表示"函数不会正常结束"
+> 4. 需要固定取值集合时，按偏好顺序：字面量联合 > `as const` 对象 > `enum`
+
 ---
 
 ## 第五章：函数类型
+
+> **本章目标**：学会给函数写类型——参数/返回值注解、可选与默认参数、剩余参数；掌握函数类型表达式、重载、调用/构造签名；理解泛型函数、`void` 与 `undefined` 的区别、`this` 类型声明。
 
 ### 5.1 参数类型和返回值类型
 
@@ -1146,9 +1200,16 @@ const admins = db.filterUsers(function (this: User) {
 
 > ⚠️ `this` 参数只能用 `function` 关键字，不能用箭头函数（箭头函数的 `this` 由词法作用域决定）。
 
+> **本章小结**：
+> 1. 函数类型 = 参数类型 + 返回值类型；可选（`?`）、默认（`=`）、剩余（`...`）参数各有用途
+> 2. 重载适合"参数形式决定返回类型"的场景；能用联合类型就别用重载
+> 3. `() => void` 的函数实现可以返回任何值，但该值会被忽略（这也是回调类型兼容性宽松的原因）
+
 ---
 
 ## 第六章：对象类型、类型别名与接口
+
+> **本章目标**：描述对象"形状"——内联注解、可选/只读属性；分清 `type` 与 `interface` 的差异；掌握索引签名、多余属性检查、扩展与交叉类型、泛型对象类型、元组。
 
 ### 6.1 对象类型注解
 
@@ -1405,9 +1466,16 @@ const p: Point = [1, 2];
 
 > **与 Python 对比**：Python 的 tuple 是运行时不可变对象。TS 的元组类型对应固定长度、类型各异的**数组**，运行时就是 JS 数组——`readonly` 只是编译时约束。
 
+> **本章小结**：
+> 1. 描述对象形状优先用 `interface`（支持声明合并、错误信息清晰）；需要联合/原始/函数类型时用 `type`
+> 2. 多余属性检查只对**对象字面量**生效，先赋值给变量再传递可绕过
+> 3. 元组 = 固定长度、位置类型已知的数组；需要不可变时用 `readonly [..]`
+
 ---
 
 ## 第七章：联合类型、字面量类型与类型收窄
+
+> **本章目标**：理解联合类型与类型收窄的机制；熟练使用各类类型守卫（`typeof`、truthiness、等值、`in`、`instanceof`、`Array.isArray`、类型谓词）；掌握可辨识联合与穷尽性检查；理解字面量类型与推断拓宽问题。
 
 ### 7.1 联合类型
 
@@ -1599,11 +1667,13 @@ function assertIsString(value: unknown): asserts value is string {
   }
 }
 
-function process(value: unknown) {
+function handleValue(value: unknown) {
   assertIsString(value);
-  value.toUpperCase();  // value: string
+  value.toUpperCase();  // value: string（断言函数之后的收窄）
 }
 ```
+
+> 命名提示：示例用 `handleValue` 而不是 `process`，是为了避免与 Node.js 的全局 `process` 对象（`@types/node` 中声明）重名。
 
 ### 7.3 可辨识联合（Discriminated Union）
 
@@ -1733,9 +1803,16 @@ const req2 = { url: "https://example.com", method: "GET" } as const;
 // 所有属性都被推断为字面量类型
 ```
 
+> **本章小结**：
+> 1. 收窄的核心机制：条件分支中，TS 依据类型守卫把联合类型缩小为更精确的子集
+> 2. **可辨识联合**（共用一个字面量判别字段）是 TS 最重要的类型模式之一，配合 `switch`/`if` 使用
+> 3. 用 `never` 做**穷尽性检查**：以后给联合类型新增成员时，编译器会提醒你更新所有分支
+
 ---
 
 ## 第八章：类型推导与断言
+
+> **本章目标**：理解 TS 的自动类型推导与省略注解的最佳实践；掌握类型断言 `as`、`@ts-expect-error`、非空断言 `!` 的用途与风险；会用 `satisfies` 同时校验类型并保留精确推断。
 
 ### 8.1 类型推导
 
@@ -1828,15 +1905,29 @@ palette.green.toUpperCase();
 
 ```typescript
 // ❌ 类型注解：green 被拓宽为 string | RGB，丢失了精确类型
-const palette1: Record<Colors, string | RGB> = { ... };
-palette1.green.toUpperCase();  // Error: string | RGB 没有 toUpperCase
+const palette1: Record<Colors, string | RGB> = {
+  red: [255, 0, 0],
+  green: "#00ff00",
+  blue: [0, 0, 255],
+};
+// @ts-expect-error —— string | RGB 没有 toUpperCase 方法
+palette1.green.toUpperCase();
 
 // ❌ as 断言：green 也被拓宽为 string | RGB
-const palette2 = { ... } as Record<Colors, string | RGB>;
-palette2.green.toUpperCase();  // Error: 同上
+const palette2 = {
+  red: [255, 0, 0],
+  green: "#00ff00",
+  blue: [0, 0, 255],
+} as Record<Colors, string | RGB>;
+// @ts-expect-error —— 同上
+palette2.green.toUpperCase();
 
 // ✅ satisfies：green 保留为 string（精确推断），同时检查整体结构
-const palette3 = { ... } satisfies Record<Colors, string | RGB>;
+const palette3 = {
+  red: [255, 0, 0],
+  green: "#00ff00",
+  blue: [0, 0, 255],
+} satisfies Record<Colors, string | RGB>;
 palette3.green.toUpperCase();  // OK
 ```
 
@@ -1844,9 +1935,17 @@ palette3.green.toUpperCase();  // OK
 1. 检查值的类型是否符合约束
 2. 保留最精确的推导类型
 
+> **本章小结**：
+> 1. 类型能推断出来时就省略注解，保持代码简洁
+> 2. 断言（`as`）是"我比编译器更懂"，要克制使用；跨大类转换需先过 `unknown`
+> 3. 抑制错误优先用 `@ts-expect-error`（未命中会报 TS2578 提醒你），而非 `@ts-ignore`
+> 4. `satisfies` 在检查类型的同时保留精确推断，适合配置对象等场景
+
 ---
 
 ## 第九章：泛型（Generics）
+
+> **本章目标**：理解泛型解决"代码复用 + 类型安全"的思路；掌握泛型函数、多类型参数、泛型约束；会写泛型接口/别名/类。
 
 ### 9.1 为什么需要泛型
 
@@ -1977,9 +2076,16 @@ type A = Unwrap<Promise<string>>;  // string
 type B = Unwrap<number>;           // number
 ```
 
+> **本章小结**：
+> 1. 泛型 = 类型参数：调用时填充，既复用代码又不丢类型信息
+> 2. 需要访问属性（如 `.length`）时，用 `extends` 约束泛型参数
+> 3. 泛型可用于函数、接口、类型别名与类；多数场景下 TS 能自动推断类型参数
+
 ---
 
 ## 第十章：类（Classes）
+
+> **本章目标**：掌握 TS 类的完整语法——字段与构造器、可见性修饰符、参数属性、`readonly`、存取器、`private` vs `#`、继承、抽象类、`implements`、静态成员，并了解装饰器。
 
 ### 10.1 基本语法
 
@@ -2253,11 +2359,13 @@ class Calculator {
 new Calculator().add(1, 2);  // 控制台输出: Calling add with [1, 2]
 ```
 
-> 装饰器目前是 TC39 Stage 3 提案，TS 5.0+ 原生支持。要启用装饰器，需要在 tsconfig 中设置 `"experimentalDecorators": true`（旧语法）或不设置（新语法，TS 5.0+ 默认支持）。Angular/NestJS 项目通常使用旧语法。
+> 装饰器是 TC39 Stage 3 提案。TypeScript 5.0+ 支持**两套**装饰器语法：**标准语法**（ECMAScript 标准草案，即本示例所用；无需任何配置，`ClassMethodDecoratorContext` 等类型为内置）和**旧语法**（需在 tsconfig 中设置 `"experimentalDecorators": true`，Angular/NestJS 项目目前仍在使用）。两者不可混用——启用 `experimentalDecorators` 后，标准语法会报错。
 
 ---
 
 ## 第十一章：模块系统
+
+> **本章目标**：掌握 `export`/`import` 的各种形式（命名、默认、重命名、`* as`）；会用 `import type` 做类型专用导入；理解 CommonJS 与 ES Module 的互操作（`esModuleInterop`、Node ESM 扩展名规则）。
 
 ### 11.1 导出与导入
 
@@ -2358,17 +2466,17 @@ JS 世界有两套模块系统：Node.js 传统的 **CommonJS**（`require`/`mod
 }
 ```
 
-设置 `esModuleInterop: true` 后，可以用 ES Module 语法导入 CommonJS 模块：
+`esModuleInterop` 控制如何用 ES Module 语法导入 CommonJS 模块。**TypeScript 6.0 起该选项始终启用（无法关闭）**，因此默认导入写法始终合法：
 
 ```typescript
-// 有 esModuleInterop 时，这样写是合法的：
+// TS 6.0+（esModuleInterop 始终启用）：直接默认导入即可
 import express from "express";       // CommonJS 模块
 
-// 没有 esModuleInterop 时，需要：
-import * as express from "express";
+// 旧版本（esModuleInterop: false）下才需要命名空间导入：
+// import * as express from "express";
 ```
 
-> **建议**：新项目始终在 tsconfig 中开启 `esModuleInterop: true`，避免不必要的导入语法差异。
+> **建议**：统一使用默认导入（`import express from "express"`）写法，无需再关心 esModuleInterop 的配置差异。
 
 > ⚠️ **Node ESM 下的扩展名问题**：在 Vite/Webpack 等打包器环境中，导入本地模块时可以省略扩展名（`import { foo } from "./bar"`）。但在 Node.js ESM 模式（`moduleResolution: nodenext`）下，很多场景需要写完整扩展名：
 >
@@ -2386,15 +2494,19 @@ import * as express from "express";
 
 ## 第十二章：声明文件与类型空间
 
+> **本章目标**：理解 `.d.ts` 声明文件的作用；会通过 DefinitelyTyped 安装 `@types` 包；能编写简单的自定义声明文件；了解三斜线指令的适用场景。
+
 ### 12.1 什么是声明文件（.d.ts）
 
 纯 JavaScript 库本身没有类型信息，但很多现代库会在包内自带 `.d.ts` 类型定义，不需要额外安装。对于没有内置类型的库，TypeScript 通过**声明文件**（Declaration File，扩展名 `.d.ts`）来添加类型描述。这样你在 TS 中导入 JS 库时，就能获得类型检查和自动补全。
 
 ```typescript
-// 假设你安装了一个纯 JS 库 "lodash"
-import _ from "lodash";
-_.chunk([1, 2, 3, 4], 2);  // 如果没有类型定义，TS 不知道 chunk 的参数和返回值
+// 假设你安装了一个纯 JS 库 "lodash"，但没有对应的类型定义：
+import _ from "lodash";   // 编译期直接报错 TS2307：找不到模块 "lodash" 的类型声明
+_.chunk([1, 2, 3, 4], 2); // 更谈不上参数和返回值的类型检查
 ```
+
+安装 `@types/lodash` 后（见 12.2），错误消失，`_.chunk` 的参数和返回值都能获得类型检查。
 
 ### 12.2 DefinitelyTyped 与 @types
 
@@ -2411,7 +2523,7 @@ npm install -D @types/express
 npm install -D @types/node
 ```
 
-安装后，TS 会自动识别这些类型定义，无需额外配置。
+安装后，通过 `import` 使用的模块类型（如 `@types/lodash`）会被自动识别，无需额外配置。但要注意：**TypeScript 6.0 起 `types` 选项默认是 `[]`**，因此提供**全局**类型的包（如 `@types/node` 的 `process`、`Buffer`）不会自动加载，需要在 `tsconfig.json` 中显式配置 `"types": ["node"]`（见附录 A）——只通过 `import` 使用的类型不受此影响。
 
 ### 12.3 自己编写声明文件
 
@@ -2456,7 +2568,8 @@ export {};  // 确保文件被当作模块
 
 ## 第十三章：高级类型概览（选读）
 
-> 本章介绍 TypeScript 的高级类型操作符，属于进阶内容。初学者可以先跳过，需要时再回来查阅。
+> **本章目标**：了解索引访问类型、`keyof`、`typeof`（类型位置）、条件类型、映射类型、模板字面量类型这六类类型操作符，能读懂并写出常见的高级类型。
+> 本章属于进阶内容。初学者可以先跳过，需要时再回来查阅。
 
 ### 13.1 索引访问类型
 
@@ -2567,6 +2680,8 @@ type EventHandlers = `on${Capitalize<Events>}`;
 ---
 
 ## 第十四章：Zod —— 运行时验证
+
+> **本章目标**：理解"编译时类型 ≠ 运行时安全"的问题；掌握 Zod 的 schema 定义、`parse`/`safeParse` 错误处理、`z.infer` 类型推断；会用常用 schema（字符串/数字/对象/数组/枚举/联合）并完成一个 API 响应验证实战。
 
 ### 14.1 为什么需要 Zod
 
@@ -2899,6 +3014,8 @@ TypeScript 学习的难点不是语法本身，而是读懂类型错误并理解
 | `Property 'X' does not exist on type 'Y'` | 访问不存在的属性 | 检查拼写，或用类型守卫收窄 |
 | `Argument of type 'X' is not assignable to parameter of type 'Y'` | 参数类型不匹配 | 检查函数签名，或用类型断言 |
 | `No overload matches this call` | 函数重载都不匹配 | 检查参数类型和数量 |
+| `Unused '@ts-expect-error' directive.`（TS2578） | `@ts-expect-error` 下一行其实没有错误 | 删除该指令；确认你要抑制的错误确实存在 |
+| `tsconfig.json is present but will not be loaded...`（TS5112） | 目录有 `tsconfig.json` 却在命令行指定了文件 | 去掉命令行文件参数（改用 `tsc`），或加 `--ignoreConfig` |
 
 ---
 
@@ -2950,7 +3067,7 @@ TypeScript 学习的难点不是语法本身，而是读懂类型错误并理解
 }
 ```
 
-> **选择建议**：用 Vite/Webpack/Parcel 等打包器 → 选 `bundler`；直接用 Node.js 运行 → 选 `nodenext`。详见附录 TS 6.0 变更说明。
+> **选择建议**：用 Vite/Webpack/Parcel 等打包器 → 选 `bundler`；直接用 Node.js 运行 → 选 `nodenext`。详见附录 TS 6.0/7.0 变更说明。
 
 > ⚠️ `noUncheckedIndexedAccess` 会让所有索引访问（如 `arr[i]`、`obj[key]`）的返回值类型自动包含 `undefined`。这很安全，但会使代码中频繁出现非空断言（`!`）或条件判断。初学者可以先关闭此选项，熟悉 TS 后再启用。
 
@@ -2969,18 +3086,25 @@ TypeScript 学习的难点不是语法本身，而是读懂类型错误并理解
 }
 ```
 
-### TypeScript 6.0 主要变更（2026 年发布）
+### TypeScript 6.0 / 7.0 主要变更（2026 年发布）
 
-如果你使用 TypeScript 6.0+，以下编译选项默认值发生了变化：
+TypeScript 6.0（2026 年发布）调整了部分编译选项的默认值；TypeScript 7.0（2026 年 7 月发布）是原生 Go 移植，编译速度提升 8–12 倍，并移除了 6.0 中弃用的选项。如果你从 5.x 升级，以下是主要变化：
 
-| 选项 | 5.x 常见默认/行为 | 6.0 变化 | 建议 |
-|------|-----------------|---------|------|
-| `strict` | 默认 `false` | 默认 `true` | 新项目保留 `true` |
-| `target` | 默认 `es3`（偏低） | 当前为 `es2025` | 生产项目仍建议显式写出 |
-| `module` | 常需手动设置 | 默认 `esnext` | Node 项目单独考虑 `nodenext` |
+| 选项 | 5.x 行为 | 6.0 变化 | 建议 |
+|------|---------|---------|------|
+| `strict` | 默认 `false` | 默认 `true`（无 tsconfig.json 时也开启） | 新项目保留 `true` |
+| `target` | 默认 `es5`（偏低） | 默认 `es2025` | 生产项目仍建议显式写出 |
+| `module` | 常需手动设置 | 默认 ESM 系列（跟随 target）；`tsc --init` 生成 `nodenext` | Node 项目单独考虑 `nodenext` |
 | `esModuleInterop` | 默认 `false` | 始终启用，无法设为 `false` | 无需手动设置 |
-| `moduleResolution` | `node/node10` 常见 | `node/node10` 已弃用 | Node 用 `nodenext`，Vite/Webpack 用 `bundler` |
+| `moduleResolution` | `node`/`node10` 常见 | `node`/`node10` 已弃用（7.0 移除） | Node 用 `nodenext`，Vite/Webpack 用 `bundler` |
 | `types` | 自动包含所有 `@types` | 默认 `[]`（空） | `@types/node`、`@types/jest` 等需显式配置 |
+
+其他 6.0 变更：
+- `target: "es5"`、`--downlevelIteration`、`--baseUrl`、`amd`/`umd`/`system` 模块格式等被弃用（7.0 移除）；`outFile` 在 6.0 直接移除，改用外部打包器
+- `rootDir` 默认值改为 `.`
+- 目录中存在 `tsconfig.json` 时，命令行指定文件（`tsc foo.ts`）会报错 `TS5112`，需加 `--ignoreConfig` 忽略配置
+- 新增 `es2025` 的 `target`/`lib` 选项、`Temporal` 类型、`RegExp.escape` 等
+- 旧式 `module Foo {}` 命名空间语法（应使用 `namespace`）变为硬错误；导入属性使用 `with` 取代 `asserts`
 
 > 这些变更主要是为了让新项目的默认行为更现代化。核心语法（类型注解、泛型、联合类型等）不受影响。
 
